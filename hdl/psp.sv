@@ -10,6 +10,8 @@
  */
 module psp
     (
+        output logic [3:0] led,
+        input logic reset,
         input logic clk
     );
 
@@ -33,13 +35,17 @@ module psp
         .clk(clk)
     );
 
-    assign main_mem_port_a.addr = 0;
-    assign main_mem_port_a.data_i = 0;
-    assign main_mem_port_a.data_en = 4'b1111;
-    assign main_mem_port_a.write_en = 1'b1;
+    // Something to ensure opt doesn't optimize out the entire design:
+    assign led = main_mem_port_a.data_en;
 
     // Caches
 
     // Core
+    core core(
+        .imem(main_mem_port_a.driver),
+        .dmem(main_mem_port_b.driver),
+        .reset(reset),
+        .clk(clk)
+    );
 
 endmodule

@@ -42,12 +42,16 @@ module memory
 
     // @TODO: Support arbitrary MEM_WIDTH
     // Use BRAM supported byte enable signals
-    logic [31:0] ram [MEM_SIZE-1:0];
+    logic [31:0] ram [(MEM_SIZE/4)-1:0];
 
     // Strip off 2 lower bits from input addresses:
     logic [$clog2(MEM_SIZE)-3:0] addr_a_aligned, addr_b_aligned;
     assign addr_a_aligned = addr_a >> 2;
     assign addr_b_aligned = addr_b >> 2;
+
+    initial begin
+        $readmemh("/project/memories/empty", ram);
+    end
 
     // I wonder what happens if both ports try to write to the same address at the same time... Hmm
 
