@@ -57,11 +57,29 @@ module core
      *
      * (Instruction is in imem.data_o)
      */
+
+    // Current instruction in decode (just makes code easier to read):
+    logic[31:0] d_instr;
+
     always_comb begin
         decode.instruction = imem.data_o;
-        decode.rs1_idx = decode.instruction[24:20];
-        decode.rs2_idx = decode.instruction[19:15];
-        decode.rd_idx = decode.instruction[11:7];
+        d_instr = decode.instruction;
+
+        // Decode opcode:
+        decode.rs1_idx = d_instr[24:20];
+        decode.rs2_idx = d_instr[19:15];
+        decode.rd_idx = d_instr[11:7];
+        decode.opcode = d_instr[6:0];
+        decode.func7 = d_instr[31:25];
+        decode.func3 = d_instr[14:12];
+        decode.i_imm = { {20{d_instr[11]}}, d_instr[11:0]};
+        decode.s_imm = { {20{d_instr[31]}}, d_instr[31:25], d_instr[11:7]};
+        decode.b_imm = { {19{d_instr[31]}}, d_instr[31], d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
+        decode.u_imm = { d_instr[31:12], {12{1'b0}}};
+        decode.j_imm = { {11{d_instr[31]}}, d_instr[31], d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
+
+        // Setup control signals:
+        decode.load_rd = 0; // @TODO: Signals needed by execute
     end
 
     always_ff @ (posedge clk) begin
@@ -78,7 +96,6 @@ module core
             execute <= decode; 
             execute.rs1_val <= regs[decode.rs1_idx];
             execute.rs2_val <= regs[decode.rs2_idx];
-            execute.load_rd <= 0;
         end
     end
 
@@ -89,12 +106,40 @@ module core
      * calculate an address to be used in Memory stage.
      */
     
+    always_ff @ (posedge clk) begin
+        if (reset) begin
+            // Clear execute internal state
+
+            // Clear control word for mem
+            mem.valid <= 0;
+        end
+        else begin
+            // Update execute internal state
+
+            // Setup control word for mem
+            mem <= execute;
+        end
+    end
 
     /*
      * Memory
      *
      * Read / write to data memory
      */
+    always_ff @ (posedge clk) begin
+        if (reset) begin
+            // Clear mem internal state
+
+            // Clear control word for wb
+            wb.valid <= 0;
+        end
+        else begin
+            // Update mem internal state
+
+            // Setup control word for wb
+            wb <= mem;
+        end
+    end
 
     /*
      * Writeback
