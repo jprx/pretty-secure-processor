@@ -182,6 +182,8 @@ module tb_memory();
             $finish;
         end
 
+        $display("All checks passed!");
+
         $finish;
     end
 
