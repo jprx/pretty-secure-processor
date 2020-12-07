@@ -22,11 +22,13 @@ module psp
         .data_i_a(main_mem_port_a.data_i),
         .data_o_a(main_mem_port_a.data_o),
         .data_en_a(main_mem_port_a.data_en),
+        .write_en_a(main_mem_port_a.write_en),
 
         .addr_b(main_mem_port_b.addr),
         .data_i_b(main_mem_port_b.data_i),
         .data_o_b(main_mem_port_b.data_o),
         .data_en_b(main_mem_port_b.data_en),
+        .write_en_b(main_mem_port_b.write_en),
 
         .clk(clk)
     );

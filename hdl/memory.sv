@@ -18,7 +18,9 @@
  */
 module memory
     #(
+        // Max aligned address will be 1/4 this:
         parameter MEM_SIZE=8192
+        // 8192 has max aligned address of 2048
     )
     (
         // Port A
@@ -40,12 +42,12 @@ module memory
 
     // @TODO: Support arbitrary MEM_WIDTH
     // 4 separate per-byte RAMs to support per-byte assignment with 2 ports:
-    logic [7:0] ram [(MEM_SIZE/4)-1:0][4];
+    logic [7:0] ram[4][(MEM_SIZE/4)-1:0];
 
     // Strip off 2 lower bits from input addresses:
     logic [$clog2(MEM_SIZE)-3:0] addr_a_aligned, addr_b_aligned;
-    assign addr_a_aligned = addr_a[$clog2(MEM_SIZE)-3:2];
-    assign addr_b_aligned = addr_b[$clog2(MEM_SIZE)-3:2];
+    assign addr_a_aligned = addr_a >> 2;
+    assign addr_b_aligned = addr_b >> 2;
 
     // I wonder what happens if both ports try to write to the same address at the same time... Hmm
 
@@ -57,14 +59,14 @@ module memory
             // Wanted to use a single for loop here but Vivado can't handle for loops + range slicing at the same time.
             for (i = 0 ; i < 4 ; i++) begin
                 for (j = 0 ; j < 8 ; j++) begin
-                    if (data_en_a[0]) ram[0][addr_a_aligned][j] <= data_i_a[(8*i)+j];
+                    if (data_en_a[i]) ram[i][addr_a_aligned][j] <= data_i_a[(8*i)+j];
                 end
             end
         end
         else begin
             for (i = 0 ; i < 4 ; i++) begin
                 for (j = 0 ; j < 8 ; j++) begin
-                    data_o_a[(8*i) + j] <= ram[i][addr_a_aligned];
+                    data_o_a[(8*i) + j] <= ram[i][addr_a_aligned][j];
                 end
             end
         end // write_en_a
@@ -74,14 +76,14 @@ module memory
             // Wanted to use a single for loop here but Vivado can't handle for loops + range slicing at the same time.
             for (i = 0 ; i < 4 ; i++) begin
                 for (j = 0 ; j < 8 ; j++) begin
-                    if (data_en_b[0]) ram[0][addr_b_aligned][j] <= data_i_b[(8*i)+j];
+                    if (data_en_b[i]) ram[i][addr_b_aligned][j] <= data_i_b[(8*i)+j];
                 end
             end
         end
         else begin
             for (i = 0 ; i < 4 ; i++) begin
                 for (j = 0 ; j < 8 ; j++) begin
-                    data_o_b[(8*i) + j] <= ram[i][addr_b_aligned];
+                    data_o_b[(8*i) + j] <= ram[i][addr_b_aligned][j];
                 end
             end
         end // write_en_b
