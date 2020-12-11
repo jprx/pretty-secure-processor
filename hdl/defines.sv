@@ -115,6 +115,9 @@ typedef struct packed {
 
     // Is this word valid?
     logic valid;
+
+    // RVFI stuff
+    logic[31:0] pc_next; // PC written by this instruction (usually PC + 4)
 } controlword;
 
 `endif // DEFINES

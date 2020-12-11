@@ -3,14 +3,18 @@
  *
  * The main PSP processor core.
  */
-`include "memory_if.sv"
 `include "defines.sv"
+`include "memory_if.sv"
+`include "rvfi_if.sv"
 
 module core
     (
         // Instruction & data memory
         mem_if.driver imem,
         mem_if.driver dmem,
+
+        // RVFI attachment
+        output rvfi_if rvfi_out,
 
         input logic reset,
         input logic clk
@@ -195,6 +199,10 @@ module core
                 execute_next.wb_command     =   wb_alu;
             end
         endcase
+
+        // RVFI stuff
+        // @TODO: UPDATE THIS FIELD IN EXECUTE IF BRANCH
+        execute_next.pc_next = pc;
     end
 
     always_ff @ (posedge clk) begin
@@ -336,6 +344,28 @@ module core
             wb_ret : wb_val = wb.pc + 4;
             wb_imm : wb_val = wb.imm;
         endcase
+
+        if (wb.rd_idx == 0) wb_val = 0;
+    end
+
+    // Formal verification stuff:
+    always_comb begin
+        // RVFI signals:
+        rvfi_out.valid = wb.valid;
+        rvfi_out.insn = wb.instruction;
+        rvfi_out.rs1_addr = wb.rs1_idx;
+        rvfi_out.rs2_addr = wb.rs2_idx;
+        rvfi_out.rs1_rdata = wb.rs1_val;
+        rvfi_out.rs2_rdata = wb.rs2_val;
+        rvfi_out.rd_addr = wb.rd_idx;
+        rvfi_out.rd_wdata = wb_val;
+        rvfi_out.pc_rdata = wb.pc;
+        rvfi_out.pc_wdata = wb.pc_next;
+        rvfi_out.mem_addr = wb.alu_out;
+        rvfi_out.mem_rmask = wb.opcode == op_load ? 4'b1111 : 4'b0000;
+        rvfi_out.mem_wmask = wb.opcode == op_store ? 4'b1111 : 4'b0000;
+        rvfi_out.mem_rdata = wb.mem_out;
+        rvfi_out.mem_wdata = wb.rs2_val;
     end
 
 endmodule

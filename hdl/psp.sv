@@ -2,7 +2,8 @@
  * Joseph Ravichandran
  * December 6, 2020
  */
- `include "memory_if.sv"
+`include "memory_if.sv"
+`include "rvfi_if.sv"
 
 /*
  * psp
@@ -11,6 +12,7 @@
 module psp
     (
         output logic [3:0] led,
+        output rvfi_if rvfi_out,
         input logic reset,
         input logic clk
     );
@@ -44,6 +46,7 @@ module psp
     core core(
         .imem(main_mem_port_a.driver),
         .dmem(main_mem_port_b.driver),
+        .rvfi_out(rvfi_out),
         .reset(reset),
         .clk(clk)
     );
