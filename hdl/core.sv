@@ -283,7 +283,7 @@ module core
         .command(execute.cmp_command),
         .cmp_out(cmp_out)
     );
-    
+
     always_ff @ (posedge clk) begin
         if (reset) begin
             // Clear execute internal state
@@ -307,7 +307,7 @@ module core
 
     always_comb begin
         wb_next = mem;
-        dmem.addr = mem.alu_out;
+        dmem.addr = {mem.alu_out[31:2], 2'b00};
         dmem.data_i = mem.rs2_val;
 
         // @TODO: byte width stuff
@@ -328,7 +328,6 @@ module core
 
             // Setup control word for wb
             wb <= wb_next;
-            wb.mem_out <= dmem.data_o;
         end
     end
 
@@ -342,6 +341,7 @@ module core
     logic[31:0] wb_val;
 
     always_comb begin
+        wb.mem_out = dmem.data_o;
         case (wb.wb_command)
             wb_alu : wb_val = wb.alu_out;
             wb_cmp : wb_val = wb.cmp_out;
@@ -362,8 +362,8 @@ module core
         rvfi_out.rs2_addr = wb.rs2_idx;
         rvfi_out.rs1_rdata = wb.rs1_val;
         rvfi_out.rs2_rdata = wb.rs2_val;
-        rvfi_out.rd_addr = wb.rd_idx;
-        rvfi_out.rd_wdata = wb_val;
+        rvfi_out.rd_addr = wb.load_rd ? wb.rd_idx : 0;
+        rvfi_out.rd_wdata = wb.load_rd ? wb_val : 0;
         rvfi_out.pc_rdata = wb.pc;
         rvfi_out.pc_wdata = wb.pc_next;
         rvfi_out.mem_addr = wb.alu_out;

@@ -6,19 +6,22 @@ nop
 nop
 nop
 nop
-addi x1, x1, 20
+addi x1, x1, 84
 nop
 nop
 nop
-lw x1, 0(x1)
+nop
+lw x2, 0(x1)
 nop
 nop
 nop
-addi x1, x1, 4
+nop
+addi x2, x2, 4
 nop
 nop
 nop
-sw x1, 0(x1)
+nop
+sw x2, 0(x1)
 
 label1:
     .long 0x69694200
