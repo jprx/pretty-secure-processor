@@ -1,6 +1,6 @@
 // DO NOT EDIT -- auto-generated from riscv-formal/monitor/generate.py
 //
-// Command line options: -i rv32i -c 1 -a -p psp_rvfimon -V
+// Command line options: -i rv32i -c 1 -a -p psp_rvfimon
 
 module psp_rvfimon (
   input clock,
@@ -126,28 +126,6 @@ module psp_rvfimon (
   always @(posedge clock) begin
     ch0_errcode <= 0;
     if (!reset && ch0_rvfi_valid) begin
-      $display("-------- RVFI Monitor insn in channel 0: %m at time %0t --------", $time);
-      $display("rvfi_valid = %x", ch0_rvfi_valid);
-      $display("rvfi_order = %x", ch0_rvfi_order);
-      $display("rvfi_insn = %x", ch0_rvfi_insn);
-      $display("rvfi_trap = %x", ch0_rvfi_trap);
-      $display("rvfi_halt = %x", ch0_rvfi_halt);
-      $display("rvfi_intr = %x", ch0_rvfi_intr);
-      $display("rvfi_rs1_addr = %x", ch0_rvfi_rs1_addr);
-      $display("rvfi_rs2_addr = %x", ch0_rvfi_rs2_addr);
-      $display("rvfi_rs1_rdata = %x", ch0_rvfi_rs1_rdata);
-      $display("rvfi_rs2_rdata = %x", ch0_rvfi_rs2_rdata);
-      $display("rvfi_rd_addr = %x", ch0_rvfi_rd_addr);
-      $display("rvfi_rd_wdata = %x", ch0_rvfi_rd_wdata);
-      $display("rvfi_pc_rdata = %x", ch0_rvfi_pc_rdata);
-      $display("rvfi_pc_wdata = %x", ch0_rvfi_pc_wdata);
-      $display("rvfi_mem_addr = %x", ch0_rvfi_mem_addr);
-      $display("rvfi_mem_rmask = %x", ch0_rvfi_mem_rmask);
-      $display("rvfi_mem_wmask = %x", ch0_rvfi_mem_wmask);
-      $display("rvfi_mem_rdata = %x", ch0_rvfi_mem_rdata);
-      $display("rvfi_mem_wdata = %x", ch0_rvfi_mem_wdata);
-      $display("spec_valid = %x", ch0_spec_valid);
-      $display("spec_trap = %x", ch0_spec_trap);
       if (ch0_spec_valid) begin
         if (ch0_rvfi_trap != ch0_spec_trap) begin
           ch0_handle_error(101, "mismatch in trap");
