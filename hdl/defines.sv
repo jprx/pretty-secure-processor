@@ -2,7 +2,7 @@
 `define DEFINES
 
 // Different opcodes:
-enum logic[6:0] {
+typedef enum logic[6:0] {
     op_lui      = 7'b0110111, // U type
     op_auipc    = 7'b0010111, // U type
     op_jal      = 7'b1101111, // J type
@@ -12,24 +12,19 @@ enum logic[6:0] {
     op_store    = 7'b0100011, // S type
     op_imm      = 7'b0010011, // I type
     op_reg      = 7'b0110011  // R type
-}
+} opcode_names;
 
 // Different func3 values for ALU operations
 typedef enum logic[2:0] {
-    func3_add   = 3'b000; // If func7[6] is 1 this becomes sub
-    func3_sll   = 3'b001;
-    func3_slt   = 3'b010;
-    func3_sltu  = 3'b011;
-    func3_xor   = 3'b100;
-    func3_srl   = 3'b101; // If func7[6] is 1 this becomes sra
-    func3_or    = 3'b110;
-    func3_and   = 3'b111;
+    func3_add   = 3'b000, // If func7[6] is 1 this becomes sub
+    func3_sll   = 3'b001,
+    func3_slt   = 3'b010,
+    func3_sltu  = 3'b011,
+    func3_xor   = 3'b100,
+    func3_srl   = 3'b101, // If func7[6] is 1 this becomes sra
+    func3_or    = 3'b110,
+    func3_and   = 3'b111
 } func3_alu;
-
-// Different func3 values for CMP operations
-typedef enum logic[2:0] {
-
-} func3_cmp;
 
 // ALU commands
 // The compare commands run on the compare unit instead of ALU
@@ -37,14 +32,14 @@ typedef enum logic[2:0] {
 // would need extra hardware in decode stage to negate rs2, which is the same
 // cost as just adding a sub function to the ALU
 typedef enum logic[2:0] {
-    alu_add     = 3'b000;
-    alu_sll     = 3'b001;
-    alu_sra     = 3'b010;
-    alu_sub     = 3'b011;
-    alu_xor     = 3'b100;
-    alu_srl     = 3'b101;
-    alu_or      = 3'b110;
-    alu_and     = 3'b111;
+    alu_add     = 3'b000,
+    alu_sll     = 3'b001,
+    alu_sra     = 3'b010,
+    alu_sub     = 3'b011,
+    alu_xor     = 3'b100,
+    alu_srl     = 3'b101,
+    alu_or      = 3'b110,
+    alu_and     = 3'b111
 } alu_cmd;
 
 // Comparison commands
@@ -60,7 +55,7 @@ typedef enum logic[2:0] {
 
     // >=
     cmp_ge      = 3'b101,
-    cmp_geu     = 3'b111,
+    cmp_geu     = 3'b111
 } cmp_cmd;
 
 // What gets written back to a register?

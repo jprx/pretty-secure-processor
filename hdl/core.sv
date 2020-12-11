@@ -44,7 +44,7 @@ module core
         if (reset) begin
             // Clear fetch internal state and control word for decode
             pc <= 0;
-            decode.this_addr <= 0;
+            decode.pc <= 0;
             decode.valid <= 0;
         end
         else begin
@@ -141,15 +141,15 @@ module core
         endcase
 
         // Setup CMP stuff:
-        case (execute_next.opcode) begin
-            op_br       :   execute_next.cmp_command = func3_cmp'(execute_next.func3);
+        case (execute_next.opcode)
+            op_br       :   execute_next.cmp_command = cmp_cmd'(execute_next.func3);
 
             op_imm, op_reg : begin
                 execute_next.cmp_command = execute_next.func3[0] == 0 ? cmp_lt : cmp_ltu;
             end
 
             default     :   execute_next.cmp_command = cmp_eq; // Don't care (could optimize with gating CMP)
-        end
+        endcase
         execute_next.cmp_mux = execute_next.opcode == op_imm ? 1 : 0; // rs2 if not op_imm, otherwise imm
         
         // Setup MEM stuff (do we read/ write?):
@@ -235,7 +235,7 @@ module core
      */
 
     logic[31:0] alu_in1, alu_in2, alu_out;
-    alu alu(
+    alu alu_inst (
         .in1(alu_in1),
         .in2(alu_in2),
         .command(execute.alu_command),
@@ -264,9 +264,9 @@ module core
 
     // Comparison unit
     logic cmp_out;
-    cmp cmp (
-        .in1(rs1),
-        .in2(execute.cmp_mux == 1'b1 ? execute.imm : execute.rs2),
+    cmp cmp_inst (
+        .in1(execute.rs1_val),
+        .in2(execute.cmp_mux == 1'b1 ? execute.imm : execute.rs2_val),
         .command(execute.cmp_command),
         .cmp_out(cmp_out)
     );
