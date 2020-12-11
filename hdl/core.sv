@@ -73,13 +73,13 @@ module core
         d_instr = execute_next.instruction;
 
         // Decode opcode:
-        execute_next.rs1_idx = d_instr[24:20];
-        execute_next.rs2_idx = d_instr[19:15];
+        execute_next.rs1_idx = d_instr[19:15];
+        execute_next.rs2_idx = d_instr[24:20];
         execute_next.rd_idx = d_instr[11:7];
-        execute_next.opcode = d_instr[6:0];
+        execute_next.opcode = rv_opcode'(d_instr[6:0]);
         execute_next.func7 = d_instr[31:25];
         execute_next.func3 = d_instr[14:12];
-        execute_next.i_imm = { {20{d_instr[11]}}, d_instr[11:0]};
+        execute_next.i_imm = { {20{d_instr[31]}}, d_instr[31:20]};
         execute_next.s_imm = { {20{d_instr[31]}}, d_instr[31:25], d_instr[11:7]};
         execute_next.b_imm = { {19{d_instr[31]}}, d_instr[31], d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
         execute_next.u_imm = { d_instr[31:12], {12{1'b0}}};
@@ -209,8 +209,8 @@ module core
 
             // Setup the control word for execute
             execute <= execute_next;
-            execute.rs1_val <= regs[decode.rs1_idx];
-            execute.rs2_val <= regs[decode.rs2_idx];
+            execute.rs1_val <= regs[execute_next.rs1_idx];
+            execute.rs2_val <= regs[execute_next.rs2_idx];
         end
     end
 

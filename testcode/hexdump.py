@@ -9,5 +9,5 @@ if len(sys.argv) != 2:
 with open (sys.argv[1], "rb") as file_f:
     data = file_f.read(4)
     while data:
-        print(data.hex())
+        print(data[::-1].hex())
         data = file_f.read(4)

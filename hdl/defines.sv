@@ -12,7 +12,7 @@ typedef enum logic[6:0] {
     op_store    = 7'b0100011, // S type
     op_imm      = 7'b0010011, // I type
     op_reg      = 7'b0110011  // R type
-} opcode_names;
+} rv_opcode;
 
 // Different func3 values for ALU operations
 typedef enum logic[2:0] {
@@ -75,7 +75,7 @@ typedef struct packed {
     /*
      * Decode-created signals
      */
-    logic[6:0] opcode;
+    rv_opcode opcode;
     logic[4:0] rs1_idx, rs2_idx, rd_idx;
     logic[31:0] rs1_val, rs2_val, rd_val;
     logic load_rd;
