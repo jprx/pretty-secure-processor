@@ -54,10 +54,13 @@ module core
             pc <= 0;
         end
         else begin
-            if (branching)
-                pc <= branch_target;
-            else
-                pc <= pc + 4;
+            // Only progress pc if we aren't stalling fetch
+            if (stall_stage < 1) begin
+                if (branching)
+                    pc <= branch_target;
+                else
+                    pc <= pc + 4;
+            end
         end
     end
 
@@ -220,8 +223,13 @@ module core
         execute_next.rs1_val = regs[execute_next.rs1_idx];
         execute_next.rs2_val = regs[execute_next.rs2_idx];
 
+        // If WB is about to rewrite RS1 or RS2 just forward that onto EX:
+        if (wb.valid && wb.load_rd && wb.rd_idx == execute_next.rs1_idx && wb.rd_idx != 0)
+            execute_next.rs1_val = wb_val;
+        if (wb.valid && wb.load_rd && wb.rd_idx == execute_next.rs2_idx && wb.rd_idx != 0)
+            execute_next.rs2_val = wb_val;
+
         // RVFI stuff:
-        // @TODO: UPDATE THIS FIELD IN EXECUTE IF BRANCH
         execute_next.pc_next = pc;
     end
 
@@ -232,7 +240,7 @@ module core
         for (i = 1; i < 32 ; i++) begin
             if (reset) regs[i] <= 32'h0;
             else begin
-                if (i == wb.rd_idx && wb.load_rd && wb.valid) regs[i] <= wb_val;
+                if (i == wb.rd_idx && wb.load_rd && wb.valid && stall_stage < 5) regs[i] <= wb_val;
             end
         end
     end
@@ -250,6 +258,9 @@ module core
     logic branching;
     logic[31:0] branch_target;
 
+    // Does execute need to stall?
+    logic ex_hazard_stall;
+
     logic[31:0] alu_in1, alu_in2, alu_out;
     alu alu_inst (
         .in1(alu_in1),
@@ -258,15 +269,52 @@ module core
         .alu_out(alu_out)
     );
 
+    // "Effective" rs1 and rs2 (with hazards detected):
+    logic[31:0] ex_rs1_val, ex_rs2_val;
+
+    // Hazard detection
+    always_comb begin
+        ex_rs1_val = execute.rs1_val;
+        ex_rs2_val = execute.rs2_val;
+        ex_hazard_stall = 1'b0;
+
+        // Check for hazards we can overcome:
+        // (Don't forward x0, it's always just 0)
+        if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs1_idx && wb.rd_idx != 0) begin
+            $display("Forwarding WB -> EX rs1 %0h", execute.instruction);
+            ex_rs1_val = wb_val;
+        end
+        if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs2_idx && wb.rd_idx != 0) begin
+            $display("Forwarding WB -> EX rs2 %0h", execute.instruction);
+            ex_rs2_val = wb_val;
+        end
+
+        // Check for stall-worthy hazards:
+        // (Don't forward x0, it's always just 0)
+        // @TODO: Only stall if these signals are actually needed
+        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
+            ex_hazard_stall = 1;
+        end
+        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
+            ex_hazard_stall = 1;
+        end
+    end
+
     // Setup alu_in1 and alu_in2 based on control word
     always_comb begin
         case (execute.alu_mux1)
-            0: alu_in1 = execute.rs1_val;
+            // rs1
+            0: alu_in1 = ex_rs1_val;
+
+            // pc
             1: alu_in1 = execute.pc;
         endcase
 
         case (execute.alu_mux2)
-            0: alu_in2 = execute.rs2_val;
+            // rs2
+            0: alu_in2 = ex_rs2_val;
+
+            // imm
             1: alu_in2 = execute.imm;
         endcase
     end
@@ -295,8 +343,8 @@ module core
     // Comparison unit
     logic cmp_out;
     cmp cmp_inst (
-        .in1(execute.rs1_val),
-        .in2(execute.cmp_mux == 1'b1 ? execute.imm : execute.rs2_val),
+        .in1(ex_rs1_val),
+        .in2(execute.cmp_mux == 1'b1 ? execute.imm : ex_rs2_val),
         .command(execute.cmp_command),
         .cmp_out(cmp_out)
     );
@@ -339,36 +387,40 @@ module core
     // Value written back to register file:
     logic[31:0] wb_val;
 
+    // Value from memory used in writeback. This is dmem.data_o but possibly shifted
+    logic[31:0] wb_mem_val;
+
     always_comb begin
-        wb.mem_out = dmem.data_o;
+        wb_mem_val = dmem.data_o;
         if (mem.opcode == op_load || mem.opcode == op_store) begin
             // Zero extend by default
             case (func3_mem'(mem.func3))
                 func3_byte, func3_ubyte : begin
-                    wb.mem_out = (wb.mem_out >> {mem.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
+                    wb_mem_val = (wb_mem_val >> {mem.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
                 end
 
                 func3_half, func3_uhalf : begin
-                    wb.mem_out = (wb.mem_out >> {mem.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
+                    wb_mem_val = (wb_mem_val >> {mem.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
                 end
             endcase
 
             // Sign extend where necessary
             if (func3_mem'(mem.func3) == func3_byte) begin
-                wb.mem_out = {{24{wb.mem_out[7]}}, wb.mem_out[7:0]};
+                wb_mem_val = {{24{wb_mem_val[7]}}, wb_mem_val[7:0]};
             end
 
             if (func3_mem'(mem.func3) == func3_half) begin
-                wb.mem_out = {{16{wb.mem_out[15]}}, wb.mem_out[15:0]};
+                wb_mem_val = {{16{wb_mem_val[15]}}, wb_mem_val[15:0]};
             end
         end
 
         case (wb.wb_command)
             wb_alu : wb_val = wb.alu_out;
             wb_cmp : wb_val = wb.cmp_out;
-            wb_mem : wb_val = wb.mem_out;
+            wb_mem : wb_val = wb_mem_val;
             wb_ret : wb_val = wb.pc + 4;
             wb_imm : wb_val = wb.imm;
+            default : wb_val = wb.alu_out;
         endcase
 
         if (wb.rd_idx == 0) wb_val = 0;
@@ -390,14 +442,11 @@ module core
         rvfi_out.mem_addr = wb.alu_out;
         rvfi_out.mem_rmask = wb.opcode == op_load ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_wmask = wb.opcode == op_store ? wb.dmem_mask : 4'b0000;
-        rvfi_out.mem_rdata = wb.mem_out;
+        rvfi_out.mem_rdata = wb_mem_val;
         rvfi_out.mem_wdata = wb.rs2_val;
     end
 
     // Flushing and stalling:
-    logic pipeline_stall; // Should we stall the pipeline?
-    assign pipeline_stall = 1'b0;
-
     /*
      * pipeline_flush[0]: invalidate current fetch
      * pipeline_flush[1]: invalidate current decode
@@ -406,6 +455,34 @@ module core
      * Can't invalidate writeback stage, its too late by then!
      */
     logic [3:0] pipeline_flush;
+
+    /*
+     * stall_stage
+     *
+     * Stage at which the pipeline must be stalled.
+     * Every stage <= stall_stage will not progress.
+     * NOTE: This includes internal stage state!! (Fetch shouldn't change PC while stalled).
+     *
+     * Internal state to consider:
+     *  fetch PC (DONE)
+     *  memory writing to IO devices (@TODO)
+     *  writeback modifying register file (DONE)
+     *
+     * stall_stage == 3'b000 (0): Stall nothing
+     * stall_stage == 3'b001 (1): Stall fetch
+     * stall_stage == 3'b010 (2): Stall fetch and decode
+     * stall_stage == 3'b011 (3): Stall fetch, decode, execute
+     * stall_stage == 3'b100 (4): Stall fetch, decode, execute, memory
+     * stall_stage == 3'b101 (5): Stall entire pipeline
+     */
+    logic [2:0] stall_stage;
+
+    always_comb begin
+        stall_stage = 0;
+
+        // Execute detected a hazard that requires stalling!
+        //if (ex_hazard_stall) stall_stage = 3; // Stall fetch, decode, execute
+    end
 
     always_comb begin
         pipeline_flush = 4'b0000;
@@ -426,17 +503,23 @@ module core
             wb.valid <= 0;
         end
         else begin
-            if (!pipeline_stall) begin
-                decode <= decode_next;
-                execute <= execute_next;
-                mem <= mem_next;
-                wb <= wb_next;
+            // stall_stage of 0 means no stalling. Otherwise we stall various parts of the pipeline
+            if (stall_stage < 1) decode <= decode_next;
+            if (stall_stage < 2) execute <= execute_next;
+            if (stall_stage < 3) mem <= mem_next;
+            if (stall_stage < 4) wb <= wb_next;
+            // if stall_stage < 5 wb will not do anything internally to change state
 
-                if (pipeline_flush[0]) decode.valid <= 1'b0;
-                if (pipeline_flush[1]) execute.valid <= 1'b0;
-                if (pipeline_flush[2]) mem.valid <= 1'b0;
-                if (pipeline_flush[3]) wb.valid <= 1'b0;
-            end
+            // Inject bubbles after stalled stages:
+            if (stall_stage == 1) decode.valid <= 1'b0;
+            if (stall_stage == 2) execute.valid <= 1'b0;
+            if (stall_stage == 3) mem.valid <= 1'b0;
+            if (stall_stage == 4) wb.valid <= 1'b0;
+
+            if (pipeline_flush[0]) decode.valid <= 1'b0;
+            if (pipeline_flush[1]) execute.valid <= 1'b0;
+            if (pipeline_flush[2]) mem.valid <= 1'b0;
+            if (pipeline_flush[3]) wb.valid <= 1'b0;
         end
     end
 

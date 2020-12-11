@@ -23,12 +23,9 @@ module memory
         // 8192 has max aligned address of 2048
     )
     (
-        // Port A
+        // Port A (READONLY)
         input logic [$clog2(MEM_SIZE)-1:0] addr_a,
-        input logic [31:0] data_i_a,
         output logic [31:0] data_o_a,
-        input logic [3:0] data_en_a,
-        input logic write_en_a,
 
         // Port B
         input logic [$clog2(MEM_SIZE)-1:0] addr_b,
@@ -50,19 +47,26 @@ module memory
     assign addr_b_aligned = addr_b >> 2;
 
     initial begin
-        $readmemh("/project/testcode/test3.mem", ram);
+        $readmemh("/project/testcode/test4.mem", ram);
     end
 
     // I wonder what happens if both ports try to write to the same address at the same time... Hmm
 
     always @ (posedge clk) begin
         // Port A
+        /*
         if (write_en_a) begin
             if(data_en_a[0]) ram[addr_a_aligned][7:0] <= data_i_a[7:0];
             if(data_en_a[1]) ram[addr_a_aligned][15:8] <= data_i_a[15:8];
             if(data_en_a[2]) ram[addr_a_aligned][23:16] <= data_i_a[23:16];
             if(data_en_a[3]) ram[addr_a_aligned][31:24] <= data_i_a[31:24];
+            data_o_a <= ram[addr_a_aligned];
         end
+        else begin
+            data_o_a <= ram[addr_a_aligned];
+        end*/
+
+        // Make port A readonly because Vivado can't infer true dual-port and we don't really need it
         data_o_a <= ram[addr_a_aligned];
     end
 
@@ -73,8 +77,11 @@ module memory
             if(data_en_b[1]) ram[addr_b_aligned][15:8] <= data_i_b[15:8];
             if(data_en_b[2]) ram[addr_b_aligned][23:16] <= data_i_b[23:16];
             if(data_en_b[3]) ram[addr_b_aligned][31:24] <= data_i_b[31:24];
+            data_o_b <= ram[addr_b_aligned];
         end
-        data_o_b <= ram[addr_b_aligned];
+        else begin
+            data_o_b <= ram[addr_b_aligned];
+        end
     end
 
 endmodule
