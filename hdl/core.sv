@@ -281,11 +281,9 @@ module core
         // Check for hazards we can overcome:
         // (Don't forward x0, it's always just 0)
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs1_idx && wb.rd_idx != 0) begin
-            $display("Forwarding WB -> EX rs1 %0h", execute.instruction);
             ex_rs1_val = wb_val;
         end
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs2_idx && wb.rd_idx != 0) begin
-            $display("Forwarding WB -> EX rs2 %0h", execute.instruction);
             ex_rs2_val = wb_val;
         end
 
@@ -333,6 +331,8 @@ module core
         mem_next = execute;
         mem_next.alu_out = alu_out;
         mem_next.cmp_out = cmp_out;
+        mem_next.rs1_val = ex_rs1_val;
+        mem_next.rs2_val = ex_rs2_val;
 
         // Update RVFI word
         if (branching) begin
@@ -481,7 +481,7 @@ module core
         stall_stage = 0;
 
         // Execute detected a hazard that requires stalling!
-        //if (ex_hazard_stall) stall_stage = 3; // Stall fetch, decode, execute
+        if (ex_hazard_stall) stall_stage = 3; // Stall fetch, decode, execute
     end
 
     always_comb begin
