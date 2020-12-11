@@ -162,6 +162,8 @@ module core
         execute_next.cmp_mux = execute_next.opcode == op_imm ? 1 : 0; // rs2 if not op_imm, otherwise imm
         
         // Setup MEM stuff (do we read/ write?):
+        // Mask gets recalculated later on when we know address, for now just set it to 0:
+        execute_next.mem_mask = 4'b0000;
 
         // Setup WB stuff (do we writeback memory out? Or alu out? etc.)
         case (execute_next.opcode)
@@ -310,10 +312,22 @@ module core
         dmem.addr = {mem.alu_out[31:2], 2'b00};
         dmem.data_i = mem.rs2_val;
 
-        // @TODO: byte width stuff
-        dmem.data_en = 4'b1111;
+        // Technically only loads can use unsigned, so in theory store should never
+        // have func3_ubyte or func3_uhalf. So this is safe.
+        dmem.data_en = 4'b0000;
+        if (mem.opcode == op_load || mem.opcode == op_store) begin
+            case (func3_mem'(mem.func3))
+                func3_byte, func3_ubyte      :   dmem.data_en = 4'b0001 << mem.alu_out[1:0];
+                func3_half, func3_uhalf      :   dmem.data_en = 4'b0011 << {mem.alu_out[1], 1'b0};
+                func3_word      :   dmem.data_en = 4'b1111;
+            endcase
+        end
 
         dmem.write_en = mem.opcode == op_store;
+
+        // Pass signals along for RVFI:
+        wb_next.dmem_mask = dmem.data_en;
+        wb_next.dmem_write_en = dmem.write_en;
     end
 
     always_ff @ (posedge clk) begin
@@ -342,6 +356,28 @@ module core
 
     always_comb begin
         wb.mem_out = dmem.data_o;
+        if (mem.opcode == op_load || mem.opcode == op_store) begin
+            // Zero extend by default
+            case (func3_mem'(mem.func3))
+                func3_byte, func3_ubyte : begin
+                    wb.mem_out = (wb.mem_out >> {mem.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
+                end
+
+                func3_half, func3_uhalf : begin
+                    wb.mem_out = (wb.mem_out >> {mem.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
+                end
+            endcase
+
+            // Sign extend where necessary
+            if (func3_mem'(mem.func3) == func3_byte) begin
+                wb.mem_out = {{24{wb.mem_out[7]}}, wb.mem_out[7:0]};
+            end
+
+            if (func3_mem'(mem.func3) == func3_half) begin
+                wb.mem_out = {{16{wb.mem_out[15]}}, wb.mem_out[15:0]};
+            end
+        end
+
         case (wb.wb_command)
             wb_alu : wb_val = wb.alu_out;
             wb_cmp : wb_val = wb.cmp_out;
@@ -367,8 +403,8 @@ module core
         rvfi_out.pc_rdata = wb.pc;
         rvfi_out.pc_wdata = wb.pc_next;
         rvfi_out.mem_addr = wb.alu_out;
-        rvfi_out.mem_rmask = wb.opcode == op_load ? 4'b1111 : 4'b0000;
-        rvfi_out.mem_wmask = wb.opcode == op_store ? 4'b1111 : 4'b0000;
+        rvfi_out.mem_rmask = wb.opcode == op_load ? wb.dmem_mask : 4'b0000;
+        rvfi_out.mem_wmask = wb.opcode == op_store ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_rdata = wb.mem_out;
         rvfi_out.mem_wdata = wb.rs2_val;
     end

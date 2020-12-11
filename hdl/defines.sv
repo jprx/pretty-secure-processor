@@ -26,6 +26,17 @@ typedef enum logic[2:0] {
     func3_and   = 3'b111
 } func3_alu;
 
+// Different func3 values for load / store ops
+typedef enum logic[2:0] {
+    func3_byte  = 3'b000,
+    func3_half  = 3'b001,
+    func3_word  = 3'b010,
+
+    // Only load uses unsigned
+    func3_ubyte = 3'b100,
+    func3_uhalf = 3'b101
+} func3_mem;
+
 // ALU commands
 // The compare commands run on the compare unit instead of ALU
 // ALU has dedicated add and sub modes- could combine into 1 adder, but
@@ -100,6 +111,8 @@ typedef struct packed {
     // cmp_mux: 0 = rs2, 1 = imm
     logic cmp_mux;
 
+    logic[3:0] mem_mask;
+
     wb_cmd wb_command;
 
     /*
@@ -112,6 +125,9 @@ typedef struct packed {
      * Memory-created signals
      */
     logic[31:0] mem_out;
+
+    logic[3:0] dmem_mask;
+    logic dmem_write_en;
 
     // Is this word valid?
     logic valid;
