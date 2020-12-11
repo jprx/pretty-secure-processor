@@ -239,7 +239,7 @@ module core
         .in1(alu_in1),
         .in2(alu_in2),
         .command(execute.alu_command),
-        .alu_out(mem_next.alu_out)
+        .alu_out(alu_out)
     );
 
     // Setup alu_in1 and alu_in2 based on control word
@@ -258,14 +258,17 @@ module core
     // Update anything in the control word
     always_comb begin
         mem_next = execute;
+        mem_next.alu_out = alu_out;
+        mem_next.cmp_out = cmp_out;
     end
 
     // Comparison unit
+    logic cmp_out;
     cmp cmp (
         .in1(rs1),
         .in2(execute.cmp_mux == 1'b1 ? execute.imm : execute.rs2),
         .command(execute.cmp_command),
-        .cmp_out(mem_next.cmp_out)
+        .cmp_out(cmp_out)
     );
     
     always_ff @ (posedge clk) begin
@@ -290,8 +293,14 @@ module core
      */
 
     always_comb begin
-        // @TODO: Connect dmem signals here
         wb_next = mem;
+        dmem.addr = mem.alu_out;
+        dmem.data_i = mem.rs2_val;
+
+        // @TODO: byte width stuff
+        dmem.data_en = 4'b1111;
+
+        dmem.write_en = mem.opcode == op_store;
     end
 
     always_ff @ (posedge clk) begin
@@ -330,21 +339,4 @@ module core
     end
 
 endmodule
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
