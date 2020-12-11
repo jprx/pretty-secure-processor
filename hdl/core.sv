@@ -54,7 +54,10 @@ module core
             pc <= 0;
         end
         else begin
-            pc <= pc + 4;
+            if (branching)
+                pc <= branch_target;
+            else
+                pc <= pc + 4;
         end
     end
 
@@ -107,7 +110,8 @@ module core
         execute_next.alu_command = alu_add;
         if (execute_next.opcode == op_imm || execute_next.opcode == op_reg) begin
             case (func3_alu'(execute_next.func3))
-                func3_add   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_add : alu_sub;
+                // For op_reg sub we fix this later:
+                func3_add   :   execute_next.alu_command = alu_add;
                 func3_sll   :   execute_next.alu_command = alu_sll;
                 func3_xor   :   execute_next.alu_command = alu_xor;
                 func3_srl   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_srl : alu_sra;
@@ -116,6 +120,13 @@ module core
 
                 default     :   execute_next.alu_command = alu_add; // Don't care (could optimize with gating ALU)
             endcase
+        end
+
+        // Only op reg supports sub
+        if (execute_next.opcode == op_reg) begin
+            if (func3_alu'(execute_next.func3) == func3_add) begin
+                execute_next.alu_command = execute_next.func7[6] == 0 ? alu_add : alu_sub;
+            end
         end
 
         // alu_mux1 is 0 for rs1, 1 for pc
@@ -234,6 +245,11 @@ module core
      * calculate an address to be used in Memory stage.
      */
 
+    // Are we branching this cycle?
+    // If so, need to invalidate current fetch and decode
+    logic branching;
+    logic[31:0] branch_target;
+
     logic[31:0] alu_in1, alu_in2, alu_out;
     alu alu_inst (
         .in1(alu_in1),
@@ -255,11 +271,25 @@ module core
         endcase
     end
 
+    // Check for branch
+    always_comb begin
+        branching = 0;
+        branch_target = alu_out;
+        if (execute.opcode == op_br || execute.opcode == op_jal || execute.opcode == op_jalr) begin
+            branching = cmp_out;
+        end
+    end
+
     // Update anything in the control word
     always_comb begin
         mem_next = execute;
         mem_next.alu_out = alu_out;
         mem_next.cmp_out = cmp_out;
+
+        // Update RVFI word
+        if (branching) begin
+            mem_next.pc_next = branch_target;
+        end
     end
 
     // Comparison unit
@@ -364,45 +394,49 @@ module core
         rvfi_out.mem_wdata = wb.rs2_val;
     end
 
+    // Flushing and stalling:
+    logic pipeline_stall; // Should we stall the pipeline?
+    assign pipeline_stall = 1'b0;
+
+    /*
+     * pipeline_flush[0]: invalidate current fetch
+     * pipeline_flush[1]: invalidate current decode
+     * pipeline_flush[2]: invalidate current execute
+     * pipeline_flush[3]: invalidate current memory
+     * Can't invalidate writeback stage, its too late by then!
+     */
+    logic [3:0] pipeline_flush;
+
+    always_comb begin
+        pipeline_flush = 4'b0000;
+
+        if (branching) begin
+            // Invalidate fetch and decode
+            pipeline_flush[0] = 1'b1;
+            pipeline_flush[1] = 1'b1;
+        end
+    end
+
     // Stage latching:
     always_ff @ (posedge clk) begin
         if (reset) begin
-            // Clear control word for decode
             decode.valid <= 0;
-
-            // Clear decode internal state
-
-            // Clear control word for execute
             execute.valid <= 0;
-
-            // Clear execute internal state
-
-            // Clear control word for mem
             mem.valid <= 0;
-
-            // Clear mem internal state
-
-            // Clear control word for wb
             wb.valid <= 0;
         end
         else begin
-            // Update fetch internal state and control word for decode
-            decode <= decode_next;
+            if (!pipeline_stall) begin
+                decode <= decode_next;
+                execute <= execute_next;
+                mem <= mem_next;
+                wb <= wb_next;
 
-            // Update decode internal state
-
-            // Setup the control word for execute
-            execute <= execute_next;
-
-            // Update execute internal state
-
-            // Setup control word for mem
-            mem <= mem_next;
-
-            // Update mem internal state
-
-            // Setup control word for wb
-            wb <= wb_next;
+                if (pipeline_flush[0]) decode.valid <= 1'b0;
+                if (pipeline_flush[1]) execute.valid <= 1'b0;
+                if (pipeline_flush[2]) mem.valid <= 1'b0;
+                if (pipeline_flush[3]) wb.valid <= 1'b0;
+            end
         end
     end
 
