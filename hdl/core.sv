@@ -103,16 +103,21 @@ module core
         endcase
 
         // Setup ALU stuff:
-        case (func3_alu'(execute_next.func3))
-            func3_add   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_add : alu_sub;
-            func3_sll   :   execute_next.alu_command = alu_sll;
-            func3_xor   :   execute_next.alu_command = alu_xor;
-            func3_srl   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_srl : alu_sra;
-            func3_or    :   execute_next.alu_command = alu_or;
-            func3_and   :   execute_next.alu_command = alu_and;
+        // If the instruction isn't an immediate or reg op, set ALU to add (always add for MEM instructions,
+        // AUIPC, JALR, etc.)
+        execute_next.alu_command = alu_add;
+        if (execute_next.opcode == op_imm || execute_next.opcode == op_reg) begin
+            case (func3_alu'(execute_next.func3))
+                func3_add   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_add : alu_sub;
+                func3_sll   :   execute_next.alu_command = alu_sll;
+                func3_xor   :   execute_next.alu_command = alu_xor;
+                func3_srl   :   execute_next.alu_command = execute_next.func7[6] == 0 ? alu_srl : alu_sra;
+                func3_or    :   execute_next.alu_command = alu_or;
+                func3_and   :   execute_next.alu_command = alu_and;
 
-            default     :   execute_next.alu_command = alu_and; // Don't care (could optimize with gating ALU)
-        endcase
+                default     :   execute_next.alu_command = alu_add; // Don't care (could optimize with gating ALU)
+            endcase
+        end
 
         // alu_mux1 is 0 for rs1, 1 for pc
         case (execute_next.opcode)

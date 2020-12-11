@@ -13,6 +13,7 @@ module psp
     (
         output logic [3:0] led,
         output rvfi_if rvfi_out,
+        output logic done, // Done is asserted when main_mem_port_a requests a given address
         input logic reset,
         input logic clk
     );
@@ -39,6 +40,9 @@ module psp
 
     // Something to ensure opt doesn't optimize out the entire design:
     assign led = main_mem_port_a.data_en;
+
+    // Jump to 0x600d600d to exit
+    assign done = main_mem_port_a.addr == 32'h600d600d;
 
     // Caches
 

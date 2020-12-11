@@ -11,6 +11,7 @@
 module tb_psp();
     logic clk;
     logic [3:0] led;
+    logic done;
     logic reset;
 
     rvfi_if rvfi_out;
@@ -31,6 +32,20 @@ module tb_psp();
             if (rvfi_out.valid) begin
                 order <= order + 1;
             end
+        end
+    end
+
+    always_ff @ (posedge clk) begin
+        // Exit if DUT reports done
+        if (done) begin
+            $display("All checks passed!");
+            $finish;
+        end
+
+        if (errcode != 0) begin
+            $display("Quitting due to error code %0h", errcode);
+            $display("At instruction %d", order);
+            $finish;
         end
     end
 
@@ -68,13 +83,6 @@ module tb_psp();
         reset = 1;
         #10
         reset = 0;
-
-        #100
-
-        #10
-        $display("All checks passed!");
-
-        $finish;
     end
 
 endmodule
