@@ -315,32 +315,11 @@ module core
                 ex_hazard_stall = 1;
             end
         end
-    end
 
-    // Setup alu_in1 and alu_in2 based on control word
-    always_comb begin
-        case (execute.alu_mux1)
-            // rs1
-            0: alu_in1 = ex_rs1_val;
-
-            // pc
-            1: alu_in1 = execute.pc;
-        endcase
-
-        case (execute.alu_mux2)
-            // rs2
-            0: alu_in2 = ex_rs2_val;
-
-            // imm
-            1: alu_in2 = execute.imm;
-        endcase
-    end
-
-    always_comb begin
         // Check for branch
         branching = 0;
         branch_target = alu_out;
-        if (execute.valid) begin
+        if (execute.valid && !ex_hazard_stall) begin
             // Only flush if we are actually valid
             if (execute.opcode == op_br) begin
                 branching = cmp_out;
@@ -364,6 +343,25 @@ module core
         if (branching) begin
             mem_next.pc_next = branch_target;
         end
+    end
+
+    // Setup alu_in1 and alu_in2 based on control word
+    always_comb begin
+        case (execute.alu_mux1)
+            // rs1
+            0: alu_in1 = ex_rs1_val;
+
+            // pc
+            1: alu_in1 = execute.pc;
+        endcase
+
+        case (execute.alu_mux2)
+            // rs2
+            0: alu_in2 = ex_rs2_val;
+
+            // imm
+            1: alu_in2 = execute.imm;
+        endcase
     end
 
     // Comparison unit
@@ -479,7 +477,8 @@ module core
     // Formal verification stuff:
     always_comb begin
         // RVFI signals:
-        rvfi_out.valid = wb.valid;
+        // rvfi_out.valid = wb.valid;
+        rvfi_out.valid = 1'b0;
         rvfi_out.insn = wb.instruction;
         rvfi_out.rs1_addr = wb.rs1_idx;
         rvfi_out.rs2_addr = wb.rs2_idx;
