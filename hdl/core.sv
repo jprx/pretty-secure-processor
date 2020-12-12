@@ -379,10 +379,22 @@ module core
      * Read / write to data memory
      */
 
+    // RS2 val to be used in memory- may be forwarded from WB -> MEM
+    logic[31:0] mem_rs2_val;
+
+    always_comb begin
+        mem_rs2_val = mem.rs2_val;
+        if (wb.valid && wb.load_rd && wb.rd_idx == mem.rs2_idx && wb.rd_idx != 0) begin
+            // Forward WB -> MEM
+            $display("Forwarding WB to MEM");
+            mem_rs2_val = wb_val;
+        end
+    end
+
     always_comb begin
         wb_next = mem;
         dmem.addr = {mem.alu_out[31:2], 2'b00};
-        dmem.data_i = mem.rs2_val;
+        dmem.data_i = mem_rs2_val;
 
         // Technically only loads can use unsigned, so in theory store should never
         // have func3_ubyte or func3_uhalf. So this is safe.
@@ -477,8 +489,8 @@ module core
     // Formal verification stuff:
     always_comb begin
         // RVFI signals:
-        // rvfi_out.valid = wb.valid;
-        rvfi_out.valid = 1'b0;
+        rvfi_out.valid = wb.valid;
+        // rvfi_out.valid = 1'b0;
         rvfi_out.insn = wb.instruction;
         rvfi_out.rs1_addr = wb.rs1_idx;
         rvfi_out.rs2_addr = wb.rs2_idx;

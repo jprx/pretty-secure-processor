@@ -1,6 +1,19 @@
 # A longer test with some branches, jal/ jalrs, and hazards
 # x1 <- return address pointer
 
+add x3, x1, 1
+la x8, TEST
+sw  x3, 0(x8)
+lw  x4, TEST
+bne x3,x4, fail
+j exit
+
+TEST:
+    .word 0x00000042
+
+fail:
+    j fail
+
 jal testfn
 j exit
 
