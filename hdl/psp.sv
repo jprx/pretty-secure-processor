@@ -39,8 +39,8 @@ module psp
     // Something to ensure opt doesn't optimize out the entire design:
     assign led = main_mem_port_a.data_en;
 
-    // Jump to 0x600d600d to exit
-    assign done = main_mem_port_a.addr == 32'h600d600d;
+    // Write to 0x600d600d to exit
+    assign done = main_mem_port_b.addr == 32'h600d600d && main_mem_port_b.write_en;
 
     // Caches
 

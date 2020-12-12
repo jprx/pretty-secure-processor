@@ -97,8 +97,8 @@ module core
         case (execute_next.opcode)
             op_lui      :   execute_next.imm = execute_next.u_imm;
             op_auipc    :   execute_next.imm = execute_next.u_imm;
-            op_jal      :   execute_next.imm = execute_next.i_imm;
-            op_jalr     :   execute_next.imm = execute_next.j_imm;
+            op_jal      :   execute_next.imm = execute_next.j_imm;
+            op_jalr     :   execute_next.imm = execute_next.i_imm;
             op_br       :   execute_next.imm = execute_next.b_imm;
             op_load     :   execute_next.imm = execute_next.i_imm;
             op_store    :   execute_next.imm = execute_next.s_imm;
@@ -137,7 +137,7 @@ module core
             op_lui      :   execute_next.alu_mux1 = 0; // Technically don't care
             op_auipc    :   execute_next.alu_mux1 = 1;
             op_jal      :   execute_next.alu_mux1 = 1;
-            op_jalr     :   execute_next.alu_mux1 = 1;
+            op_jalr     :   execute_next.alu_mux1 = 0;
             op_br       :   execute_next.alu_mux1 = 1;
             op_load     :   execute_next.alu_mux1 = 0;
             op_store    :   execute_next.alu_mux1 = 0;
@@ -187,7 +187,7 @@ module core
             end
 
             // Load return address
-            op_jalr, op_jalr : begin
+            op_jal, op_jalr : begin
                 execute_next.load_rd        =   1;
                 execute_next.wb_command     =   wb_ret;
             end
@@ -290,11 +290,16 @@ module core
         // Check for stall-worthy hazards:
         // (Don't forward x0, it's always just 0)
         // @TODO: Only stall if these signals are actually needed
-        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
-            ex_hazard_stall = 1;
-        end
-        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
-            ex_hazard_stall = 1;
+        if (execute.valid) begin
+            // Only stall if we are actually valid
+            if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
+                $display("Stalling due to hazard on rs1 (x%d)", execute.rs1_idx);
+                ex_hazard_stall = 1;
+            end
+            if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
+                $display("Stalling due to hazard on rs2 (x%d)", execute.rs2_idx);
+                ex_hazard_stall = 1;
+            end
         end
     end
 
@@ -317,17 +322,24 @@ module core
         endcase
     end
 
-    // Check for branch
     always_comb begin
+        // Check for branch
         branching = 0;
         branch_target = alu_out;
-        if (execute.opcode == op_br || execute.opcode == op_jal || execute.opcode == op_jalr) begin
-            branching = cmp_out;
-        end
-    end
+        if (execute.valid) begin
+            // Only flush if we are actually valid
+            if (execute.opcode == op_br) begin
+                branching = cmp_out;
+            end
 
-    // Update anything in the control word
-    always_comb begin
+            if (execute.opcode == op_jal || execute.opcode == op_jalr) begin
+                branching = 1'b1;
+            end
+
+            if (branching) $display("[%0h] Branching to %0h", execute.pc, branch_target);
+        end
+
+        // Update anything in the control word
         mem_next = execute;
         mem_next.alu_out = alu_out;
         mem_next.cmp_out = cmp_out;
@@ -363,15 +375,20 @@ module core
         // Technically only loads can use unsigned, so in theory store should never
         // have func3_ubyte or func3_uhalf. So this is safe.
         dmem.data_en = 4'b0000;
-        if (mem.opcode == op_load || mem.opcode == op_store) begin
-            case (func3_mem'(mem.func3))
-                func3_byte, func3_ubyte      :   dmem.data_en = 4'b0001 << mem.alu_out[1:0];
-                func3_half, func3_uhalf      :   dmem.data_en = 4'b0011 << {mem.alu_out[1], 1'b0};
-                func3_word      :   dmem.data_en = 4'b1111;
-            endcase
-        end
+        dmem.write_en = 0;
 
-        dmem.write_en = mem.opcode == op_store;
+        if (mem.valid) begin
+            // Only actually talk to memory if we are valid
+            if (mem.opcode == op_load || mem.opcode == op_store) begin
+                case (func3_mem'(mem.func3))
+                    func3_byte, func3_ubyte      :   dmem.data_en = 4'b0001 << mem.alu_out[1:0];
+                    func3_half, func3_uhalf      :   dmem.data_en = 4'b0011 << {mem.alu_out[1], 1'b0};
+                    func3_word      :   dmem.data_en = 4'b1111;
+                endcase
+            end
+
+            dmem.write_en = mem.opcode == op_store;
+        end
 
         // Pass signals along for RVFI:
         wb_next.dmem_mask = dmem.data_en;
@@ -424,6 +441,10 @@ module core
         endcase
 
         if (wb.rd_idx == 0) wb_val = 0;
+
+        if (!wb.valid) begin
+            wb.load_rd = 0;
+        end
     end
 
     // Formal verification stuff:
@@ -439,7 +460,7 @@ module core
         rvfi_out.rd_wdata = wb.load_rd ? wb_val : 0;
         rvfi_out.pc_rdata = wb.pc;
         rvfi_out.pc_wdata = wb.pc_next;
-        rvfi_out.mem_addr = wb.alu_out;
+        rvfi_out.mem_addr = {wb.alu_out[31:2], 2'b00};
         rvfi_out.mem_rmask = wb.opcode == op_load ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_wmask = wb.opcode == op_store ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_rdata = wb_mem_val;
