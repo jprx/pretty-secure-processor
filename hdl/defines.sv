@@ -127,10 +127,11 @@ typedef struct packed {
     /*
      * Memory-created signals
      */
-    logic[31:0] mem_out;
 
+    // Primarily used for rvfi purposes:
     logic[3:0] dmem_mask;
     logic dmem_write_en;
+    logic[31:0] dmem_wdata;
 
     // RVFI stuff
     logic[31:0] pc_next; // PC written by this instruction (usually PC + 4)

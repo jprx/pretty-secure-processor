@@ -307,11 +307,11 @@ module core
         if (execute.valid) begin
             // Only stall if we are actually valid
             if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
-                $display("Stalling due to hazard on rs1 (x%d)", execute.rs1_idx);
+                // $display("Stalling due to hazard on rs1 (x%d)", execute.rs1_idx);
                 ex_hazard_stall = 1;
             end
             if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
-                $display("Stalling due to hazard on rs2 (x%d)", execute.rs2_idx);
+                // $display("Stalling due to hazard on rs2 (x%d)", execute.rs2_idx);
                 ex_hazard_stall = 1;
             end
         end
@@ -350,7 +350,7 @@ module core
                 branching = 1'b1;
             end
 
-            if (branching) $display("[%0h] Branching to %0h", execute.pc, branch_target);
+            // if (branching) $display("[%0h] Branching to %0h", execute.pc, branch_target);
         end
 
         // Update anything in the control word
@@ -401,12 +401,26 @@ module core
                 endcase
             end
 
+            if (mem.opcode == op_store) begin
+                // Shift memory data in if necessary
+                case (func3_mem'(mem.func3))
+                    func3_byte, func3_ubyte : begin
+                        dmem.data_i = ((dmem.data_i & 32'h00_00_00_ff) << {mem.alu_out[1:0], 3'b0});
+                    end
+
+                    func3_half, func3_uhalf : begin
+                        dmem.data_i = ((dmem.data_i & 32'h00_00_ff_ff) << {mem.alu_out[1], 4'b0});
+                    end
+                endcase
+            end
+
             dmem.write_en = mem.opcode == op_store;
         end
 
         // Pass signals along for RVFI:
         wb_next.dmem_mask = dmem.data_en;
         wb_next.dmem_write_en = dmem.write_en;
+        wb_next.dmem_wdata = dmem.data_i;
     end
 
     /*
@@ -419,28 +433,29 @@ module core
     logic[31:0] wb_val;
 
     // Value from memory used in writeback. This is dmem.data_o but possibly shifted
+    // Recall that dmem.data_o is combinatorially read as it is a cycle late (not latched in mem->wb stage reg)
     logic[31:0] wb_mem_val;
 
     always_comb begin
         wb_mem_val = dmem.data_o;
-        if (mem.opcode == op_load || mem.opcode == op_store) begin
+        if (wb.opcode == op_load || wb.opcode == op_store) begin
             // Zero extend by default
-            case (func3_mem'(mem.func3))
+            case (func3_mem'(wb.func3))
                 func3_byte, func3_ubyte : begin
-                    wb_mem_val = (wb_mem_val >> {mem.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
+                    wb_mem_val = (wb_mem_val >> {wb.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
                 end
 
                 func3_half, func3_uhalf : begin
-                    wb_mem_val = (wb_mem_val >> {mem.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
+                    wb_mem_val = (wb_mem_val >> {wb.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
                 end
             endcase
 
             // Sign extend where necessary
-            if (func3_mem'(mem.func3) == func3_byte) begin
+            if (func3_mem'(wb.func3) == func3_byte) begin
                 wb_mem_val = {{24{wb_mem_val[7]}}, wb_mem_val[7:0]};
             end
 
-            if (func3_mem'(mem.func3) == func3_half) begin
+            if (func3_mem'(wb.func3) == func3_half) begin
                 wb_mem_val = {{16{wb_mem_val[15]}}, wb_mem_val[15:0]};
             end
         end
@@ -478,7 +493,7 @@ module core
         rvfi_out.mem_rmask = wb.opcode == op_load ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_wmask = wb.opcode == op_store ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_rdata = wb_mem_val;
-        rvfi_out.mem_wdata = wb.rs2_val;
+        rvfi_out.mem_wdata = wb.dmem_wdata;
     end
 
     // Flushing and stalling:

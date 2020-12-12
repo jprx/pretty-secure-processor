@@ -40,7 +40,7 @@ module psp
     assign led = main_mem_port_a.data_en;
 
     // Write to 0x600d600d to exit
-    assign done = main_mem_port_b.addr == 32'h600d600d && main_mem_port_b.write_en;
+    assign done = main_mem_port_b.addr == 32'h600d600c && main_mem_port_b.write_en;
 
     // Caches
 
