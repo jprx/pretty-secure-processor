@@ -44,6 +44,15 @@ module core
     assign imem.data_en = 4'b1111;
     assign imem.data_i = 0;
 
+    // When stalling we need to save old imem because memory is behind a single cycle:
+    logic[31:0] old_imem;
+    logic[2:0] old_stall_stage; // Were we stalling last cycle? (If this is true and stalling is false, read from old imem)
+
+    always_ff @ (posedge clk) begin
+        old_stall_stage <= stall_stage;
+        old_imem <= imem.data_o;
+    end
+
     always_comb begin
         decode_next.pc = pc;
         decode_next.valid = !reset;
@@ -78,7 +87,12 @@ module core
 
     always_comb begin
         execute_next = decode;
+
         execute_next.instruction = imem.data_o;
+        if (stall_stage == 0 && old_stall_stage > 0) begin
+            execute_next.instruction = old_imem;
+        end
+
         d_instr = execute_next.instruction;
 
         // Decode opcode:
