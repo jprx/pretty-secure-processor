@@ -79,6 +79,9 @@ typedef enum logic[2:0] {
 } wb_cmd;
 
 typedef struct packed {
+    // Is this word valid?
+    logic valid;
+
     // Raw memory from fetch:
     logic[31:0] instruction;
     logic[31:0] pc; // Address of this instruction
@@ -128,9 +131,6 @@ typedef struct packed {
 
     logic[3:0] dmem_mask;
     logic dmem_write_en;
-
-    // Is this word valid?
-    logic valid;
 
     // RVFI stuff
     logic[31:0] pc_next; // PC written by this instruction (usually PC + 4)
