@@ -11,6 +11,8 @@
 module tb_psp();
     logic clk;
     logic [3:0] led;
+    logic[15:0] errcode;
+    logic[63:0] order;
 
     initial begin
         clk = 1'b0;
@@ -46,8 +48,6 @@ module tb_psp();
     end
 
     psp dut(.*);
-    logic[15:0] errcode;
-    logic[63:0] order;
     psp_rvfimon monitor(
         .clock(clk),
         .reset(dut.reset),

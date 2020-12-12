@@ -383,16 +383,16 @@ module core
     logic[31:0] mem_rs2_val;
 
     always_comb begin
+        wb_next = mem;
+
+        // Check for WB -> MEM Hazards
         mem_rs2_val = mem.rs2_val;
         if (wb.valid && wb.load_rd && wb.rd_idx == mem.rs2_idx && wb.rd_idx != 0) begin
             // Forward WB -> MEM
             $display("Forwarding WB to MEM");
             mem_rs2_val = wb_val;
         end
-    end
 
-    always_comb begin
-        wb_next = mem;
         dmem.addr = {mem.alu_out[31:2], 2'b00};
         dmem.data_i = mem_rs2_val;
 
@@ -431,6 +431,7 @@ module core
         wb_next.dmem_mask = dmem.data_en;
         wb_next.dmem_write_en = dmem.write_en;
         wb_next.dmem_wdata = dmem.data_i;
+        wb_next.rs2_val = mem_rs2_val;
     end
 
     /*

@@ -261,7 +261,6 @@ module psp_rvfimon (
       $display("-------- RVFI Monitor error %0d in reordered channel 0: %m at time %0t --------", code, $time);
       $display("Error message: %0s", msg);
       $display("rvfi_valid = %x", ro0_rvfi_valid);
-      $display("rvfi_insn = %x", ch0_rvfi_insn);
       $display("rvfi_order = %x", ro0_rvfi_order);
       $display("rvfi_rs1_addr = %x", ro0_rvfi_rs1_addr);
       $display("rvfi_rs2_addr = %x", ro0_rvfi_rs2_addr);
@@ -321,7 +320,6 @@ module psp_rvfimon (
       $display("-------- RVFI Monitor error %0d in reordered channel 0: %m at time %0t --------", code, $time);
       $display("Error message: %0s", msg);
       $display("rvfi_valid = %x", ro0_rvfi_valid);
-      $display("rvfi_insn = %x", ch0_rvfi_insn);
       $display("rvfi_order = %x", ro0_rvfi_order);
       $display("rvfi_rs1_addr = %x", ro0_rvfi_rs1_addr);
       $display("rvfi_rs2_addr = %x", ro0_rvfi_rs2_addr);
