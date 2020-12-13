@@ -420,14 +420,11 @@ module core
      * Read / write to data memory
      */
 
-    // RS2 val to be used in memory- may be forwarded from WB -> MEM
-    logic[31:0] mem_rs2_val;
-
     always_comb begin
         wb_next = mem;
 
         dmem.addr = {mem.alu_out[31:2], 2'b00};
-        dmem.data_i = mem_rs2_val;
+        dmem.data_i = mem.rs2_val;
 
         // Technically only loads can use unsigned, so in theory store should never
         // have func3_ubyte or func3_uhalf. So this is safe.
@@ -464,7 +461,7 @@ module core
         wb_next.dmem_mask = dmem.data_en;
         wb_next.dmem_write_en = dmem.write_en;
         wb_next.dmem_wdata = dmem.data_i;
-        wb_next.rs2_val = mem_rs2_val;
+        wb_next.rs2_val = mem.rs2_val;
     end
 
     /*
