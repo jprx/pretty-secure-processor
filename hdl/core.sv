@@ -85,6 +85,24 @@ module core
     // Current instruction in decode (just makes code easier to read):
     logic[31:0] d_instr;
 
+    /*
+     * Hazards policy:
+     *
+     * We check for hazards twice. In decode, a hazard could be in 1 of 3 places:
+     *  in execute -> unless the instruction is a load, we can grab output from MEM when we are in EX, so do nothing yet.
+     *                if the instruction is a load, we need to insert a bubble.
+     *  in mem -> we can grab output from WB when we are in EX, so do nothing yet.
+     *  in wb -> we need to grab the value NOW (in decode) because when we are in EX we will have 
+     *           read the old register value during decode.
+     *
+     * In execute, a hazard could be in 1 of 2 places:
+     *  in mem -> since we bubble in decode if the instruction is a load, if mem is loading a value into rd
+     *            we can be sure that it is NOT a load from memory instruction. We can grab rd_val from MEM and call
+     *            it a day.
+     *  in wb -> we can just grab the value from wb.
+     */
+    logic decode_hazard_stall;
+
     always_comb begin
         execute_next = decode;
 
@@ -238,13 +256,38 @@ module core
         execute_next.rs2_val = regs[execute_next.rs2_idx];
 
         // If WB is about to rewrite RS1 or RS2 just forward that onto EX:
-        if (wb.valid && wb.load_rd && wb.rd_idx == execute_next.rs1_idx && wb.rd_idx != 0)
+        // if (wb.valid && wb.load_rd && wb.rd_idx == d_instr[19:15] && wb.rd_idx != 0)
+        //     execute_next.rs1_val = wb_val;
+        // if (wb.valid && wb.load_rd && wb.rd_idx == d_instr[24:20] && wb.rd_idx != 0)
+        //     execute_next.rs2_val = wb_val;
+
+        // Forward output from WB stage to next EX stage if applicable
+        // If we don't, we will miss the register latch and be wrong in the next cycle
+        if (wb.valid && wb.load_rd && wb.rd_idx != 0 && execute_next.rs1_idx == wb.rd_idx) begin
             execute_next.rs1_val = wb_val;
-        if (wb.valid && wb.load_rd && wb.rd_idx == execute_next.rs2_idx && wb.rd_idx != 0)
+        end
+
+        if (wb.valid && wb.load_rd && wb.rd_idx != 0 && execute_next.rs2_idx == wb.rd_idx) begin
             execute_next.rs2_val = wb_val;
+        end
 
         // RVFI stuff:
         execute_next.pc_next = pc;
+    end
+
+    // Hazard stalling detection:
+    // Yes, this is at the negative edge and should be combinatorial
+    // When I had this inside the always_comb for decode the simulator sometimes would get stuck
+    // So, let's make decode_hazard_stall a register that latches on the negative edge instead
+    // That way we sample execute's state after everything has settled.
+    always_ff @ (negedge clk) begin
+        decode_hazard_stall = 0;
+        if (execute.valid && execute.load_rd && execute.opcode == op_load) begin
+            if (execute_next.rs1_idx == execute.rd_idx || execute_next.rs2_idx == execute.rd_idx) begin
+                // $display("Stalling...");
+                decode_hazard_stall <= 1;
+            end
+        end
     end
 
     // Register file:
@@ -272,9 +315,6 @@ module core
     logic branching;
     logic[31:0] branch_target;
 
-    // Does execute need to stall?
-    logic ex_hazard_stall;
-
     logic[31:0] alu_in1, alu_in2, alu_out;
     alu alu_inst (
         .in1(alu_in1),
@@ -290,36 +330,30 @@ module core
     always_comb begin
         ex_rs1_val = execute.rs1_val;
         ex_rs2_val = execute.rs2_val;
-        ex_hazard_stall = 1'b0;
 
         // Check for hazards we can overcome:
         // (Don't forward x0, it's always just 0)
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs1_idx && wb.rd_idx != 0) begin
+            // $display("%0h Forwarding WB -> EX (rs1=x%d) (%0h -> %0h)", execute.instruction, wb.rd_idx, wb_val, ex_rs1_val);
             ex_rs1_val = wb_val;
         end
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs2_idx && wb.rd_idx != 0) begin
+            // $display("%0h Forwarding WB -> EX (rs2=x%d) (%0h -> %0h)", execute.instruction, wb.rd_idx, wb_val, ex_rs2_val);
             ex_rs2_val = wb_val;
         end
 
-        // Check for stall-worthy hazards:
-        // (Don't forward x0, it's always just 0)
-        // @TODO: Only stall if these signals are actually needed
-        if (execute.valid) begin
-            // Only stall if we are actually valid
-            if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
-                // $display("Stalling due to hazard on rs1 (x%d)", execute.rs1_idx);
-                ex_hazard_stall = 1;
-            end
-            if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
-                // $display("Stalling due to hazard on rs2 (x%d)", execute.rs2_idx);
-                ex_hazard_stall = 1;
-            end
+        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs1_idx && mem.rd_idx != 0) begin
+            ex_rs1_val = mem.rd_val;
+        end
+
+        if (mem.load_rd && mem.valid && mem.rd_idx == execute.rs2_idx && mem.rd_idx != 0) begin
+            ex_rs2_val = mem.rd_val;
         end
 
         // Check for branch
         branching = 0;
         branch_target = alu_out;
-        if (execute.valid && !ex_hazard_stall) begin
+        if (execute.valid) begin
             // Only flush if we are actually valid
             if (execute.opcode == op_br) begin
                 branching = cmp_out;
@@ -343,10 +377,17 @@ module core
         if (branching) begin
             mem_next.pc_next = branch_target;
         end
-    end
 
-    // Setup alu_in1 and alu_in2 based on control word
-    always_comb begin
+        // rd_val is whatever rd is going to be loaded with as long as the instruction ISN'T a load from memory
+        case (execute.wb_command)
+            wb_alu : mem_next.rd_val = alu_out;
+            wb_cmp : mem_next.rd_val = cmp_out;
+            wb_ret : mem_next.rd_val = execute.pc + 4;
+            wb_imm : mem_next.rd_val = execute.imm;
+            default : mem_next.rd_val = alu_out;
+        endcase
+
+        // Setup alu_in1 and alu_in2 based on control word
         case (execute.alu_mux1)
             // rs1
             0: alu_in1 = ex_rs1_val;
@@ -384,14 +425,6 @@ module core
 
     always_comb begin
         wb_next = mem;
-
-        // Check for WB -> MEM Hazards
-        mem_rs2_val = mem.rs2_val;
-        if (wb.valid && wb.load_rd && wb.rd_idx == mem.rs2_idx && wb.rd_idx != 0) begin
-            // Forward WB -> MEM
-            $display("Forwarding WB to MEM");
-            mem_rs2_val = wb_val;
-        end
 
         dmem.addr = {mem.alu_out[31:2], 2'b00};
         dmem.data_i = mem_rs2_val;
@@ -471,13 +504,10 @@ module core
             end
         end
 
+        // Execute writes whatever needs to get stored (except for memory obviously) into rd_val
         case (wb.wb_command)
-            wb_alu : wb_val = wb.alu_out;
-            wb_cmp : wb_val = wb.cmp_out;
             wb_mem : wb_val = wb_mem_val;
-            wb_ret : wb_val = wb.pc + 4;
-            wb_imm : wb_val = wb.imm;
-            default : wb_val = wb.alu_out;
+            default : wb_val = wb.rd_val;
         endcase
 
         if (wb.rd_idx == 0) wb_val = 0;
@@ -542,8 +572,8 @@ module core
     always_comb begin
         stall_stage = 0;
 
-        // Execute detected a hazard that requires stalling!
-        if (ex_hazard_stall) stall_stage = 3; // Stall fetch, decode, execute
+        // Decode detected a hazard that requires stalling!
+        if (decode_hazard_stall) stall_stage = 2; // Stall fetch, decode
     end
 
     always_comb begin
