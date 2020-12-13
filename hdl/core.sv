@@ -483,37 +483,52 @@ module core
     // Recall that dmem.data_o is combinatorially read as it is a cycle late (not latched in mem->wb stage reg)
     logic[31:0] wb_mem_val;
 
+    // Memory out value shifted to byte position
+    logic[7:0] wb_mem_val_byte;
+
+    // Memory out value shifted to half position
+    logic[15:0] wb_mem_val_half;
+
     always_comb begin
-        wb_mem_val = dmem.data_o;
+        wb_mem_val_byte = (dmem.data_o >> {wb.alu_out[1:0], 3'b0});
+        wb_mem_val_half = (dmem.data_o >> {wb.alu_out[1], 4'b0});
+
         if (wb.opcode == op_load || wb.opcode == op_store) begin
-            // Zero extend by default
             case (func3_mem'(wb.func3))
-                func3_byte, func3_ubyte : begin
-                    wb_mem_val = (wb_mem_val >> {wb.alu_out[1:0], 3'b0}) & 32'h00_00_00_ff;
+                func3_ubyte : begin
+                    wb_mem_val = { {24{1'b0}}, wb_mem_val_byte };
                 end
 
-                func3_half, func3_uhalf : begin
-                    wb_mem_val = (wb_mem_val >> {wb.alu_out[1], 4'b0}) & 32'h00_00_ff_ff;
+                func3_byte : begin
+                    wb_mem_val = { {24{wb_mem_val_byte[7]}}, wb_mem_val_byte };
+                end
+
+                func3_uhalf : begin
+                    wb_mem_val = { {16{1'b0}}, wb_mem_val_half };
+                end
+
+                func3_half : begin
+                    wb_mem_val = { {16{wb_mem_val_half[15]}}, wb_mem_val_half };
+                end
+
+                default : begin
+                    wb_mem_val = dmem.data_o;
                 end
             endcase
-
-            // Sign extend where necessary
-            if (func3_mem'(wb.func3) == func3_byte) begin
-                wb_mem_val = {{24{wb_mem_val[7]}}, wb_mem_val[7:0]};
-            end
-
-            if (func3_mem'(wb.func3) == func3_half) begin
-                wb_mem_val = {{16{wb_mem_val[15]}}, wb_mem_val[15:0]};
-            end
         end
+    end
 
+    always_comb begin
         // Execute writes whatever needs to get stored (except for memory obviously) into rd_val
-        case (wb.wb_command)
-            wb_mem : wb_val = wb_mem_val;
-            default : wb_val = wb.rd_val;
-        endcase
-
-        if (wb.rd_idx == 0) wb_val = 0;
+        if (wb.rd_idx == 0) begin
+            wb_val = 0;
+        end
+        else begin
+            case (wb.wb_command)
+                wb_mem : wb_val = wb_mem_val;
+                default : wb_val = wb.rd_val;
+            endcase
+        end
     end
 
     // Formal verification stuff:

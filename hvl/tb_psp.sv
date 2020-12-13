@@ -9,10 +9,13 @@
 `include "../hdl/rvfi_if.sv"
 
 module tb_psp();
-    logic clk;
+    logic clk; // Testbench clock
+    logic sysclk; // Actual clock in
     logic [3:0] led;
     logic[15:0] errcode;
     logic[63:0] order;
+
+    assign sysclk = clk;
 
     initial begin
         clk = 1'b0;

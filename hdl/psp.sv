@@ -17,11 +17,11 @@ module psp
 
     logic clk;
 
-    logic [2:0] clk_divider;
-    assign clk = clk_divider[2];
-    always_ff @ (posedge sysclk) begin
-        clk_divider <= clk_divider + 1;
-    end
+    // logic [2:0] clk_divider;
+    assign clk = sysclk;
+    // always_ff @ (posedge sysclk) begin
+    //     clk_divider <= clk_divider + 1;
+    // end
 
     // Main Memory
     mem_if main_mem_port_a();
