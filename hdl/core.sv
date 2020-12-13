@@ -46,7 +46,9 @@ module core
 
     // When stalling we need to save old imem because memory is behind a single cycle:
     logic[31:0] old_imem;
-    logic[2:0] old_stall_stage; // Were we stalling last cycle? (If this is true and stalling is false, read from old imem)
+
+    // Were we stalling last cycle? (If this is true and stalling is false, read from old imem)
+    logic[2:0] old_stall_stage;
 
     always_ff @ (posedge clk) begin
         old_stall_stage <= stall_stage;
@@ -105,9 +107,10 @@ module core
 
     always_comb begin
         execute_next = decode;
+        decode_hazard_stall = 0;
 
         execute_next.instruction = imem.data_o;
-        if (stall_stage == 0 && old_stall_stage > 0) begin
+        if (old_stall_stage > 0) begin
             execute_next.instruction = old_imem;
         end
 
@@ -125,6 +128,14 @@ module core
         execute_next.b_imm = { {19{d_instr[31]}}, d_instr[31], d_instr[7], d_instr[30:25], d_instr[11:8], 1'b0};
         execute_next.u_imm = { d_instr[31:12], {12{1'b0}}};
         execute_next.j_imm = { {11{d_instr[31]}}, d_instr[31], d_instr[19:12], d_instr[20], d_instr[30:21], 1'b0};
+
+        // Check for hazard stall
+        if (execute.valid && execute.load_rd && execute.opcode == op_load) begin
+            if (execute_next.rs1_idx == execute.rd_idx || execute_next.rs2_idx == execute.rd_idx) begin
+                // $display("Stalling...");
+                decode_hazard_stall = 1;
+            end
+        end
 
         case (execute_next.opcode)
             op_lui      :   execute_next.imm = execute_next.u_imm;
@@ -275,27 +286,6 @@ module core
         execute_next.pc_next = pc;
     end
 
-    // Hazard stalling detection:
-    // Yes, this is at the negative edge and should be combinatorial
-    // When I had this inside the always_comb for decode the simulator sometimes would get stuck
-    // So, let's make decode_hazard_stall a register that latches on the negative edge instead
-    // That way we sample execute's state after everything has settled.
-    always_ff @ (negedge clk) begin
-        // decode_hazard_stall = 0;
-        if (execute.valid && execute.load_rd && execute.opcode == op_load) begin
-            if (execute_next.rs1_idx == execute.rd_idx || execute_next.rs2_idx == execute.rd_idx) begin
-                // $display("Stalling...");
-                decode_hazard_stall <= 1;
-            end
-            else begin
-                decode_hazard_stall <= 0;
-            end
-        end
-        else begin
-            decode_hazard_stall <= 0;
-        end
-    end
-
     // Register file:
     // Write into here only in wb stage
     integer i;
@@ -340,11 +330,9 @@ module core
         // Check for hazards we can overcome:
         // (Don't forward x0, it's always just 0)
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs1_idx && wb.rd_idx != 0) begin
-            // $display("%0h Forwarding WB -> EX (rs1=x%d) (%0h -> %0h)", execute.instruction, wb.rd_idx, wb_val, ex_rs1_val);
             ex_rs1_val = wb_val;
         end
         if (wb.load_rd && wb.valid && wb.rd_idx == execute.rs2_idx && wb.rd_idx != 0) begin
-            // $display("%0h Forwarding WB -> EX (rs2=x%d) (%0h -> %0h)", execute.instruction, wb.rd_idx, wb_val, ex_rs2_val);
             ex_rs2_val = wb_val;
         end
 
@@ -492,6 +480,7 @@ module core
     always_comb begin
         wb_mem_val_byte = (dmem.data_o >> {wb.alu_out[1:0], 3'b0});
         wb_mem_val_half = (dmem.data_o >> {wb.alu_out[1], 4'b0});
+        wb_mem_val = dmem.data_o;
 
         if (wb.opcode == op_load || wb.opcode == op_store) begin
             case (func3_mem'(wb.func3))
@@ -509,10 +498,6 @@ module core
 
                 func3_half : begin
                     wb_mem_val = { {16{wb_mem_val_half[15]}}, wb_mem_val_half };
-                end
-
-                default : begin
-                    wb_mem_val = dmem.data_o;
                 end
             endcase
         end
