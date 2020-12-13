@@ -12,8 +12,16 @@
 module psp
     (
         output logic [3:0] led,
-        input logic clk
+        input logic sysclk
     );
+
+    logic clk;
+
+    logic [2:0] clk_divider;
+    assign clk = clk_divider[2];
+    always_ff @ (posedge sysclk) begin
+        clk_divider <= clk_divider + 1;
+    end
 
     // Main Memory
     mem_if main_mem_port_a();
@@ -37,7 +45,7 @@ module psp
     );
 
     // Something to ensure opt doesn't optimize out the entire design:
-    assign led = main_mem_port_a.data_en;
+    assign led = main_mem_port_b.write_en;
 
     // Write to 0x600d600d to exit
     assign done = main_mem_port_b.addr == 32'h600d600c && main_mem_port_b.write_en;

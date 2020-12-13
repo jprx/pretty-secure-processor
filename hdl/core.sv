@@ -281,12 +281,18 @@ module core
     // So, let's make decode_hazard_stall a register that latches on the negative edge instead
     // That way we sample execute's state after everything has settled.
     always_ff @ (negedge clk) begin
-        decode_hazard_stall = 0;
+        // decode_hazard_stall = 0;
         if (execute.valid && execute.load_rd && execute.opcode == op_load) begin
             if (execute_next.rs1_idx == execute.rd_idx || execute_next.rs2_idx == execute.rd_idx) begin
                 // $display("Stalling...");
                 decode_hazard_stall <= 1;
             end
+            else begin
+                decode_hazard_stall <= 0;
+            end
+        end
+        else begin
+            decode_hazard_stall <= 0;
         end
     end
 
@@ -508,10 +514,6 @@ module core
         endcase
 
         if (wb.rd_idx == 0) wb_val = 0;
-
-        if (!wb.valid) begin
-            wb.load_rd = 0;
-        end
     end
 
     // Formal verification stuff:
