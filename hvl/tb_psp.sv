@@ -56,7 +56,7 @@ module tb_psp();
     psp_rvfimon monitor(
         .clock(dut.coreclk),
         .reset(dut.reset),
-        .rvfi_valid(dut.rvfi_out.valid),
+        .rvfi_valid(dut.rvfi_out.valid & 0),
         .rvfi_order(order),
         .rvfi_insn(dut.rvfi_out.insn),
         .rvfi_trap(0),

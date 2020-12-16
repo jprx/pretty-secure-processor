@@ -89,7 +89,7 @@ module tft
         0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 
-    // logic[7:0] logo[14401:0];
+    logic[7:0] logo[14401:0];
 
     logic[2:0] font[14251:0];
 
@@ -99,7 +99,7 @@ module tft
     logic[7:0] textmem[(80*32)-1:0];
 
     initial begin
-        // $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/logo.mem", logo);
+        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/logo.mem", logo);
         $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/font.mem", font);
         $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/splashscreen.mem", textmem);
     end
@@ -198,15 +198,35 @@ module tft
     // Work one character ahead
     logic[31:0] next_screen_x;
 
+    logic logo_color;
+
     assign next_screen_x = screen_x + 1;
     always_ff @ (posedge screenclk) begin
         next_char_idx <= fontmap[textmem[((screen_y / FONT_HEIGHT) * SCREEN_WIDTH_TEXT) + (next_screen_x / FONT_WIDTH)]];
-        r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
-        g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
-        b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        // r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        // g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        // b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+
+        logo_color <= 0;
+        if (next_screen_x >= 800 - 240) begin
+            if (screen_y <= 240) begin
+                logo_color <= logo[(((screen_y >> 1) * 120) + ((next_screen_x >> 1) - (400-120)))];
+            end
+        end
+
+        if (logo_color) begin
+            r <= logo_color;
+            g <= logo_color;
+            b <= logo_color;
+        end
+        else begin
+            r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+            g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+            b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        end
 
         if (tft_text_write_port.write_en) begin
-            textmem[(tft_text_write_port.addr >> 2)] <= tft_text_write_port.data_i;
+            textmem[(tft_text_write_port.addr)] <= tft_text_write_port.data_i;
         end
     end
 

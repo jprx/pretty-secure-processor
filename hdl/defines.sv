@@ -11,7 +11,9 @@ typedef enum logic[6:0] {
     op_load     = 7'b0000011, // I type
     op_store    = 7'b0100011, // S type
     op_imm      = 7'b0010011, // I type
-    op_reg      = 7'b0110011  // R type
+    op_reg      = 7'b0110011, // R type
+    op_scall    = 7'b1010011, // X type
+    op_sret     = 7'b1010110  // X type
 } rv_opcode;
 
 // Different func3 values for ALU operations
