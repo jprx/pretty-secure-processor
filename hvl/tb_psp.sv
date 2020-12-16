@@ -79,6 +79,7 @@ module tb_psp();
     );
 
     initial begin
+        $display("Booting up!");
         dut.reset = 1;
         #10
         dut.reset = 0;

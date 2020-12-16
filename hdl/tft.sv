@@ -17,7 +17,7 @@ module tft
         input logic clk
     );
 
-    // We want to transmit pixels at 125/4 = 31.25 MHz
+    // We want to transmit pixels at 125/3 = 41.2 MHz
 
     /*
      * Timings
@@ -44,23 +44,34 @@ module tft
      */
 
     // Virtual resolution (not active resolution):
-    localparam SCREEN_W = 32'h938;
-    localparam SCREEN_H = 32'h554;
+    localparam HSYNC_PULSE_LEN = 10;
+    localparam HSYNC_BPORCH_LEN = 88;
+    localparam HSYNC_ACTIVE_LEN = 800;
+    localparam HSYNC_FPORCH_LEN = 50;
+
+    localparam VSYNC_PULSE_LEN = 20;
+    localparam VSYNC_BPORCH_LEN = 32;
+    localparam VSYNC_ACTIVE_LEN = 480;
+    localparam VSYNC_FPORCH_LEN = 22;
 
     // Time that each signal ends
-    localparam HSYNC_PULSE_END = 10;
-    localparam HSYNC_BPORCH_END = 98;
-    localparam HSYNC_ACTIVE_END = 898;
-    localparam HSYNC_FPORCH_END = 938;
+    localparam HSYNC_PULSE_END = HSYNC_PULSE_LEN;
+    localparam HSYNC_BPORCH_END = HSYNC_BPORCH_LEN + HSYNC_PULSE_END;
+    localparam HSYNC_ACTIVE_END = HSYNC_ACTIVE_LEN + HSYNC_BPORCH_END;
+    localparam HSYNC_FPORCH_END = HSYNC_FPORCH_LEN + HSYNC_ACTIVE_END;
 
-    localparam VSYNC_PULSE_END = 20;
-    localparam VSYNC_BPORCH_END = 52;
-    localparam VSYNC_ACTIVE_END = 532;
-    localparam VSYNC_FPORCH_END = 554;
+    localparam VSYNC_PULSE_END = VSYNC_PULSE_LEN;
+    localparam VSYNC_BPORCH_END = VSYNC_BPORCH_LEN + VSYNC_PULSE_END;
+    localparam VSYNC_ACTIVE_END = VSYNC_ACTIVE_LEN + VSYNC_BPORCH_END;
+    localparam VSYNC_FPORCH_END = VSYNC_FPORCH_LEN + VSYNC_ACTIVE_END;
 
-    logic[31:0] internal_x, internal_y;
+    // Traces the entire screen, starting at sync, then back porch, active area, then front porch:
+    logic [31:0] internal_x, internal_y;
 
-    // 31.25 MHz screen clock:
+    // Goes from (0,0) to (800,480)
+    logic [31:0] screen_x, screen_y;
+
+    // 41.2 MHz screen clock:
     logic screenclk;
     logic[3:0] screen_counter;
 
@@ -71,7 +82,7 @@ module tft
             screenclk <= 0;
         end
         else begin
-            if (screen_counter >= 3) begin
+            if (screen_counter >= 2) begin
                 screenclk <= !screenclk;
                 screen_counter <= 0;
             end
@@ -83,6 +94,16 @@ module tft
 
     assign pxclk = screenclk;
 
+    // Generate screen-space coords
+    always_comb begin
+        screen_x = 0;
+        screen_y = 0;
+        if (internal_x >= HSYNC_BPORCH_END && internal_y >= VSYNC_BPORCH_END && internal_x < HSYNC_ACTIVE_END && internal_y < VSYNC_ACTIVE_END) begin
+            screen_x = internal_x - HSYNC_BPORCH_END;
+            screen_y = internal_y - VSYNC_BPORCH_END;
+        end
+    end
+
     always_ff @ (posedge screenclk or posedge reset) begin
         if (reset) begin
             internal_x <= 0;
@@ -90,10 +111,10 @@ module tft
         end
         else begin
             // Count screen
-            if (internal_x >= SCREEN_W) begin
+            if (internal_x >= HSYNC_FPORCH_END) begin
                 internal_x <= 0;
 
-                if (internal_y >= SCREEN_H) begin
+                if (internal_y >= VSYNC_FPORCH_END) begin
                     internal_y <= 0;
                 end
                 else begin
@@ -109,7 +130,7 @@ module tft
     // Are we in the horizontal / vertical active areas? (Active high)
     logic h_de, v_de;
 
-    // @TODO: Do we send hsyncs during vsync?
+    // Q: Do we send hsyncs during vsync? A: Yes
     always_comb begin
         hsync = 1;
         vsync = 1;
@@ -122,11 +143,80 @@ module tft
         else if (internal_y >= VSYNC_BPORCH_END && internal_y < VSYNC_ACTIVE_END) v_de = 1;
     end
 
-    assign de = h_de & v_de;
+    assign de = (h_de & v_de);
 
-    assign r = 8'hff;
-    assign g = 8'h00;
-    assign b = 8'hff;
+    // Draw checkers pattern
+    always_comb begin
+        r = 0;
+        g = 0;
+        b = 0;
+        if ((screen_x % 100) < 50) begin
+            if ((screen_y % 100) < 50) begin
+                r = 8'hff;
+            end
+            else begin
+                b = 8'hff;
+            end
+        end
+    end
+
+    // assign r = internal_x < 600 ? 8'hff : 0;
+    // assign g = 0;
+    // assign b = 8'hff;
+
+endmodule
+
+/*
+ * Top-level module for a TFT LCD driver test
+ */
+module tft_wrapper
+    (
+        // HSYNC, VSYNC, DE, CLK
+        // output logic rpio_02_r, rpio_03_r, rpio_04_r, rpio_05_r,
+
+        // R, G, B
+        // output logic rpio_06_r, rpio_07_r, rpio_08_r,
+
+        // Arduino pins
+        output logic[12:0] ar,
+
+        // Input clock
+        input logic sysclk
+    );
+
+    logic r_out, g_out, b_out;
+
+    logic [7:0] r, g, b;
+    logic hsync, vsync, de, pxclk, clk;
+    logic reset;
+
+
+    /*
+    assign rpio_02_r = hsync;
+    assign rpio_03_r = vsync;
+    assign rpio_04_r = de;
+    assign rpio_05_r = pxclk;
+    assign rpio_06_r = r_out;
+    assign rpio_07_r = g_out;
+    assign rpio_08_r = b_out;
+    */
+
+    assign ar[0] = de;
+    assign ar[1] = vsync;
+    assign ar[2] = hsync;
+    assign ar[3] = pxclk;
+    assign ar[4] = r_out;
+    assign ar[5] = g_out;
+    assign ar[6] = b_out;
+
+    assign reset = 0;
+    assign clk = sysclk;
+
+    tft tft_inst(.*);
+
+    assign r_out = r != 0;
+    assign g_out = g != 0;
+    assign b_out = b != 0;
 
 endmodule
 
