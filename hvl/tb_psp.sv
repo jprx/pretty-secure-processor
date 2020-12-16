@@ -27,7 +27,7 @@ module tb_psp();
         #5 clk = ~clk;
     end
 
-    always_ff @ (posedge clk) begin
+    always_ff @ (posedge dut.coreclk) begin
         if (dut.reset) begin
             order <= 0;
         end
@@ -38,7 +38,7 @@ module tb_psp();
         end
     end
 
-    always_ff @ (posedge clk) begin
+    always_ff @ (posedge dut.coreclk) begin
         // Exit if DUT reports dut.done
         if (dut.done) begin
             $display("All checks passed!");
@@ -54,7 +54,7 @@ module tb_psp();
 
     psp dut(.*);
     psp_rvfimon monitor(
-        .clock(clk),
+        .clock(dut.coreclk),
         .reset(dut.reset),
         .rvfi_valid(dut.rvfi_out.valid),
         .rvfi_order(order),
@@ -83,7 +83,7 @@ module tb_psp();
     initial begin
         $display("Booting up!");
         dut.reset = 1;
-        #10
+        #100
         dut.reset = 0;
     end
 

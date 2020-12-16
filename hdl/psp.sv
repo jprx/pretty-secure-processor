@@ -18,18 +18,12 @@ module psp
     );
 
     // Run core at 62.5MHz
-    logic coreclk;
-    logic [1:0] core_counter;
+    logic coreclk = 0;
+    logic [1:0] core_counter = 0;
 
     always_ff @ (posedge sysclk) begin
-        if (reset) begin
-            coreclk <= 0;
-            core_counter <= 0;
-        end
-        else begin
-            core_counter <= core_counter + 1;
-            if (core_counter[1]) coreclk <= !coreclk;
-        end
+        core_counter <= core_counter + 1;
+        if (core_counter == 2) coreclk <= !coreclk;
     end
 
     assign led = btn;

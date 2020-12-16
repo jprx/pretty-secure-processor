@@ -1,5 +1,10 @@
 # Kernel for pretty-secure-processor
 
+lui x1, %hi(TFT_MEM)
+addi x2, x2, %lo(TEST_CHAR)
+sb x2, 0(x1)
+j wfi_loop
+
 lui x11, %hi(TFT_MEM)
 la x12, teststr
 xor x13, x13, x13
