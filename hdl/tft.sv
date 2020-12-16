@@ -174,21 +174,6 @@ module tft
 
     assign de = (h_de & v_de);
 
-    // Draw checkers pattern
-    // always_comb begin
-    //     r = 0;
-    //     g = 0;
-    //     b = 0;
-    //     if ((screen_x % 100) < 50) begin
-    //         if ((screen_y % 100) < 50) begin
-    //             r = 8'hff;
-    //         end
-    //         else begin
-    //             b = 8'hff;
-    //         end
-    //     end
-    // end
-
     // Next char to display:
     logic[7:0] next_char;
 
@@ -203,9 +188,6 @@ module tft
     assign next_screen_x = screen_x + 1;
     always_ff @ (posedge screenclk) begin
         next_char_idx <= fontmap[textmem[((screen_y / FONT_HEIGHT) * SCREEN_WIDTH_TEXT) + (next_screen_x / FONT_WIDTH)]];
-        // r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
-        // g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
-        // b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
 
         logo_color <= 0;
         if (next_screen_x >= 800 - 240) begin
@@ -230,10 +212,6 @@ module tft
         end
     end
 
-    // assign r = internal_x < 600 ? 8'hff : 0;
-    // assign g = 0;
-    // assign b = 8'hff;
-
 endmodule
 
 /*
@@ -241,12 +219,6 @@ endmodule
  */
 module tft_wrapper
     (
-        // HSYNC, VSYNC, DE, CLK
-        // output logic rpio_02_r, rpio_03_r, rpio_04_r, rpio_05_r,
-
-        // R, G, B
-        // output logic rpio_06_r, rpio_07_r, rpio_08_r,
-
         // Arduino pins
         output logic[12:0] ar,
 
@@ -259,17 +231,6 @@ module tft_wrapper
     logic [7:0] r, g, b;
     logic hsync, vsync, de, pxclk, clk;
     logic reset;
-
-
-    /*
-    assign rpio_02_r = hsync;
-    assign rpio_03_r = vsync;
-    assign rpio_04_r = de;
-    assign rpio_05_r = pxclk;
-    assign rpio_06_r = r_out;
-    assign rpio_07_r = g_out;
-    assign rpio_08_r = b_out;
-    */
 
     assign ar[0] = de;
     assign ar[1] = vsync;
