@@ -47,7 +47,7 @@ module memory
     assign addr_b_aligned = addr_b >> 2;
 
     initial begin
-        $readmemh("/project/testcode/test7.mem", ram);
+        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/testcode/test7.mem", ram);
     end
 
     // I wonder what happens if both ports try to write to the same address at the same time... Hmm

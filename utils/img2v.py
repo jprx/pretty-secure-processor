@@ -11,6 +11,7 @@ def main():
     with open (sys.argv[2], "w") as output_f:
         img = Image.open(sys.argv[1])
         width, height = img.size
+        print(img.size)
 
         for y in range(height):
             for x in range(width):

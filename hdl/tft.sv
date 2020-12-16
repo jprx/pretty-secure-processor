@@ -75,6 +75,32 @@ module tft
     logic screenclk;
     logic[3:0] screen_counter;
 
+    localparam FONT_WIDTH = 10;
+    localparam FONT_HEIGHT = 15;
+    localparam logic[7:0] fontmap[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52,63,
+        64,65,66,67,68,69,70,71,72,73,74,75,76,77,53,54,55,56,57,58,59,60,61,62,78,79,80,81,82,83,84,26,27,
+        28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,85,86,87,88,89,90,0,1,2,3,4,
+        5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,91,92,93,94,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+        0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+
+    // logic[7:0] logo[14401:0];
+
+    logic[2:0] font[14251:0];
+
+    // Screen is 80 columns by 32 rows
+    localparam SCREEN_WIDTH_TEXT = 80;
+    localparam SCREEN_HEIGHT_TEXT = 32;
+    logic[7:0] textmem[(80*32)-1:0];
+
+    initial begin
+        // $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/logo.mem", logo);
+        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/font.mem", font);
+        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/textinit.mem", textmem);
+    end
+
     // Clock generation
     always_ff @ (posedge clk) begin
         if (reset) begin
@@ -82,7 +108,7 @@ module tft
             screenclk <= 0;
         end
         else begin
-            if (screen_counter >= 2) begin
+            if (screen_counter >= 3) begin
                 screenclk <= !screenclk;
                 screen_counter <= 0;
             end
@@ -146,18 +172,35 @@ module tft
     assign de = (h_de & v_de);
 
     // Draw checkers pattern
-    always_comb begin
-        r = 0;
-        g = 0;
-        b = 0;
-        if ((screen_x % 100) < 50) begin
-            if ((screen_y % 100) < 50) begin
-                r = 8'hff;
-            end
-            else begin
-                b = 8'hff;
-            end
-        end
+    // always_comb begin
+    //     r = 0;
+    //     g = 0;
+    //     b = 0;
+    //     if ((screen_x % 100) < 50) begin
+    //         if ((screen_y % 100) < 50) begin
+    //             r = 8'hff;
+    //         end
+    //         else begin
+    //             b = 8'hff;
+    //         end
+    //     end
+    // end
+
+    // Next char to display:
+    logic[7:0] next_char;
+
+    // Index of next char to display (from font LUT):
+    logic[7:0] next_char_idx;
+
+    // Work one character ahead
+    logic[31:0] next_screen_x;
+
+    assign next_screen_x = screen_x + 1;
+    always_ff @ (posedge screenclk) begin
+        next_char_idx <= fontmap[textmem[((screen_y / FONT_HEIGHT) * SCREEN_WIDTH_TEXT) + (next_screen_x / FONT_WIDTH)]];
+        r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+        b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
     end
 
     // assign r = internal_x < 600 ? 8'hff : 0;
