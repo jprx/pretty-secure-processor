@@ -12,11 +12,30 @@
 module psp
     (
         output logic [3:0] led,
+        output logic[12:0] ar,
+        input logic [3:0] btn,
         input logic sysclk
     );
 
-    logic clk;
-    assign clk = sysclk;
+    // Run core at 62.5MHz
+    logic coreclk;
+    logic [1:0] core_counter;
+
+    always_ff @ (posedge sysclk) begin
+        if (reset) begin
+            coreclk <= 0;
+            core_counter <= 0;
+        end
+        else begin
+            core_counter <= core_counter + 1;
+            if (core_counter[1]) coreclk <= !coreclk;
+        end
+    end
+
+    assign led = btn;
+    assign reset = btn[0];
+
+    // assign coreclk = sysclk;
 
     // PLLE2_BASE: Base Phase Locked Loop (PLL)
     //             Virtex-7
@@ -92,6 +111,10 @@ module psp
     rvfi_if rvfi_out;
     logic done, reset; // Done is asserted when main_mem_port_a requests a given address
 
+    logic port_b_in_main_mem; // Is port B pointing to an address in main memory?
+
+    assign port_b_in_main_mem = main_mem_port_b.addr < 32'h20_00_00_00;
+
     memory main_mem(
         .addr_a(main_mem_port_a.addr),
         .data_o_a(main_mem_port_a.data_o),
@@ -100,13 +123,41 @@ module psp
         .data_i_b(main_mem_port_b.data_i),
         .data_o_b(main_mem_port_b.data_o),
         .data_en_b(main_mem_port_b.data_en),
-        .write_en_b(main_mem_port_b.write_en),
+        .write_en_b(main_mem_port_b.write_en & port_b_in_main_mem),
 
-        .clk(clk)
+        .clk(coreclk)
     );
 
+    // LCD-TFT Controller Signals
+    logic r_out, g_out, b_out;
+
+    logic [7:0] r, g, b;
+    logic hsync, vsync, de, pxclk;
+
+    assign ar[0] = de;
+    assign ar[1] = vsync;
+    assign ar[2] = hsync;
+    assign ar[3] = pxclk;
+    assign ar[4] = r_out;
+    assign ar[5] = g_out;
+    assign ar[6] = b_out;
+
+    mem_if tft_text_write_port();
+
+    tft tft_inst(.*, .clk(sysclk));
+
+    always_comb begin
+        tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE;
+        tft_text_write_port.write_en = main_mem_port_b.write_en & ((main_mem_port_b.addr & TFT_MEM_BASE) != 0);
+        tft_text_write_port.data_i = main_mem_port_b.data_i;
+    end
+
+    assign r_out = r != 0;
+    assign g_out = g != 0;
+    assign b_out = b != 0;
+
     // Something to ensure opt doesn't optimize out the entire design:
-    assign led = main_mem_port_b.write_en;
+    // assign led = main_mem_port_b.write_en;
 
     // Write to 0x600d600d to exit
     assign done = main_mem_port_b.addr == 32'h600d600c && main_mem_port_b.write_en;
@@ -119,7 +170,7 @@ module psp
         .dmem(main_mem_port_b.driver),
         .rvfi_out(rvfi_out),
         .reset(reset),
-        .clk(clk)
+        .clk(coreclk)
     );
 
 endmodule

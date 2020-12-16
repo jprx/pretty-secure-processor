@@ -14,6 +14,8 @@ module tb_psp();
     logic [3:0] led;
     logic[15:0] errcode;
     logic[63:0] order;
+    logic[12:0] ar;
+    logic[3:0] btn;
 
     assign sysclk = clk;
 

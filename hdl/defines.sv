@@ -137,4 +137,6 @@ typedef struct packed {
     logic[31:0] pc_next; // PC written by this instruction (usually PC + 4)
 } controlword;
 
+parameter TFT_MEM_BASE = 32'h40_00_00_00;
+
 `endif // DEFINES

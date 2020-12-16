@@ -347,7 +347,7 @@ module core
         // Check for branch
         branching = 0;
         branch_target = alu_out;
-        if (execute.valid) begin
+        if (execute.valid && stall_stage < 3) begin
             // Only flush if we are actually valid
             if (execute.opcode == op_br) begin
                 branching = cmp_out;
@@ -414,6 +414,24 @@ module core
      * Read / write to data memory
      */
 
+    logic mem_stall, mem_was_stalling;
+    logic [4:0] mem_stall_counter;
+
+    always_ff @ (posedge clk) begin
+        mem_was_stalling <= mem_stall;
+
+        if (!mem_was_stalling && mem_stall) begin
+            mem_stall_counter <= 0;
+        end
+
+        if (mem_stall) begin
+            if (!mem_was_stalling) mem_stall_counter <= 0;
+            else begin
+                mem_stall_counter <= mem_stall_counter + 1;
+            end
+        end
+    end
+
     always_comb begin
         wb_next = mem;
 
@@ -449,6 +467,16 @@ module core
             end
 
             dmem.write_en = mem.opcode == op_store;
+        end
+
+        // Stall if we need to write to TFT (cross clock domains)
+        mem_stall = 0;
+        if (dmem.write_en) begin
+            if ((dmem.addr & TFT_MEM_BASE) != 0) begin
+                // Need a cycle to get setup:
+                if (!mem_was_stalling) mem_stall = 1;
+                else mem_stall = mem_stall_counter < 10;
+            end
         end
 
         // Pass signals along for RVFI:
@@ -573,6 +601,7 @@ module core
 
         // Decode detected a hazard that requires stalling!
         if (decode_hazard_stall) stall_stage = 2; // Stall fetch, decode
+        if (mem_stall) stall_stage = 4; // Stall fetch, decode, execute, mem (waiting on some data)
     end
 
     always_comb begin

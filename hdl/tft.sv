@@ -11,6 +11,9 @@ module tft
         output logic[7:0] r, g, b,
         output logic hsync, vsync, de, pxclk,
 
+        // Write-only port to TFT text memory
+        mem_if.bus tft_text_write_port,
+
         input logic reset,
 
         // 125 MHz system clock:
@@ -98,7 +101,7 @@ module tft
     initial begin
         // $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/logo.mem", logo);
         $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/font.mem", font);
-        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/textinit.mem", textmem);
+        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/splashscreen.mem", textmem);
     end
 
     // Clock generation
@@ -201,6 +204,10 @@ module tft
         r <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
         g <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
         b <= font[(FONT_WIDTH * FONT_HEIGHT * next_char_idx) + ((screen_y % FONT_HEIGHT) * FONT_WIDTH) + (next_screen_x % FONT_WIDTH)];
+
+        if (tft_text_write_port.write_en) begin
+            textmem[(tft_text_write_port.addr >> 2)] <= tft_text_write_port.data_i;
+        end
     end
 
     // assign r = internal_x < 600 ? 8'hff : 0;
