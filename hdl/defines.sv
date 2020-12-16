@@ -12,8 +12,8 @@ typedef enum logic[6:0] {
     op_store    = 7'b0100011, // S type
     op_imm      = 7'b0010011, // I type
     op_reg      = 7'b0110011, // R type
-    op_scall    = 7'b1010011, // X type
-    op_sret     = 7'b1010110  // X type
+    op_scall    = 7'b1010011, // J type
+    op_sret     = 7'b1010110  // I type
 } rv_opcode;
 
 // Different func3 values for ALU operations
@@ -95,6 +95,9 @@ typedef struct packed {
     logic[4:0] rs1_idx, rs2_idx, rd_idx;
     logic[31:0] rs1_val, rs2_val, rd_val;
     logic load_rd;
+
+    // Push/ pop secure stack?
+    logic secure_push, secure_pop;
 
     logic[6:0] func7;
     logic[2:0] func3;

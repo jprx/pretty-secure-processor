@@ -147,6 +147,8 @@ module core
             op_store    :   execute_next.imm = execute_next.s_imm;
             op_imm      :   execute_next.imm = execute_next.i_imm;
 
+            op_scall    :   execute_next.imm = execute_next.j_imm;
+
             default     :   execute_next.imm = execute_next.i_imm; // Don't really care
         endcase
 
@@ -187,6 +189,8 @@ module core
             op_imm      :   execute_next.alu_mux1 = 0;
             op_reg      :   execute_next.alu_mux1 = 0;
 
+            op_scall    :   execute_next.alu_mux1 = 0;
+
             default     :   execute_next.alu_mux1 = 0;
         endcase
 
@@ -201,6 +205,8 @@ module core
             op_store    :   execute_next.alu_mux2 = 1;
             op_imm      :   execute_next.alu_mux2 = 1;
             op_reg      :   execute_next.alu_mux2 = 0;
+
+            op_scall    :   execute_next.alu_mux2 = 1;
 
             default     :   execute_next.alu_mux2 = 0;
         endcase
@@ -220,6 +226,9 @@ module core
         // Setup MEM stuff (do we read/ write?):
         // Mask gets recalculated later on when we know address, for now just set it to 0:
         execute_next.mem_mask = 4'b0000;
+
+        execute_next.secure_push = 0;
+        execute_next.secure_pop = 0;
 
         // Setup WB stuff (do we writeback memory out? Or alu out? etc.)
         case (execute_next.opcode)
@@ -255,6 +264,19 @@ module core
                 if (execute_next.func3 == func3_slt || execute_next.func3 == func3_sltu) begin
                     execute_next.wb_command = wb_cmp;
                 end
+            end
+
+            // Secure call
+            op_scall : begin
+                execute_next.load_rd = 0;
+                execute_next.wb_command = wb_ret;
+                execute_next.secure_push = 1;
+            end
+
+            op_sret : begin
+                execute_next.load_rd = 0;
+                execute_next.wb_command = wb_ret;
+                execute_next.secure_pop = 1;
             end
 
             default : begin
@@ -347,13 +369,16 @@ module core
         // Check for branch
         branching = 0;
         branch_target = alu_out;
+        if (execute.opcode == op_sret) begin
+            branch_target = scall_top;
+        end
         if (execute.valid && stall_stage < 3) begin
             // Only flush if we are actually valid
             if (execute.opcode == op_br) begin
                 branching = cmp_out;
             end
 
-            if (execute.opcode == op_jal || execute.opcode == op_jalr) begin
+            if (execute.opcode == op_jal || execute.opcode == op_jalr || execute.opcode == op_scall || execute.opcode == op_sret) begin
                 branching = 1'b1;
             end
 
@@ -532,6 +557,29 @@ module core
                     wb_mem_val = { {16{wb_mem_val_half[15]}}, wb_mem_val_half };
                 end
             endcase
+        end
+    end
+
+    // Secure stack:
+    logic[31:0] secure_stack[127:0];
+    logic[10:0] secure_ptr = 0;
+    logic[31:0] scall_top = 0; // Top of stack
+    always_ff @ (posedge clk) begin
+        if (reset) begin
+            secure_ptr <= 0;
+        end
+        else begin
+            if (wb.valid && wb.secure_push && stall_stage < 5) begin
+                secure_stack[secure_ptr] <= wb_val;
+                scall_top <= wb_val;
+                secure_ptr <= secure_ptr + 1;
+            end
+            else if (execute.valid && execute.secure_pop && stall_stage < 3) begin
+                // Can never have both WB performing scall and EX performing sret because scall will cause
+                // a pipeline flush in EX
+                scall_top <= secure_stack[secure_ptr - 1];
+                secure_ptr <= secure_ptr - 1;
+            end
         end
     end
 

@@ -1,5 +1,13 @@
 # Kernel for pretty-secure-processor
 
+# Clear video memory
+lui x11, %hi(TFT_MEM)
+la x12, clear_vmem_val
+lw x12, 0(x12)
+la x13, clear_vmem_len
+lw x13, 0(x13)
+jal memset
+
 lui x11, %hi(TFT_MEM)
 la x12, welcome_str
 la x13, welcome_str_len
@@ -45,14 +53,39 @@ _memcpy_loop:
 _memcpy_exit:
 	jalr x0, x1, 0
 
+# memset(dest = x11, val = x12, len = x13)
+memset:
+_memset_loop:
+	beq x13, x0, _memset_exit
+	addi x13, x13, -1
+	sb x12, 0(x11)
+	nop
+	nop
+	nop
+	addi x11, x11, 1
+	j memset
+	nop
+	nop
+	nop
+	nop
+
+_memset_exit:
+	jalr x0, x1, 0
+
 # Generate hash in x11
 verify_hash:
+	la x16, verify_hash_num_iters
+	lw x16, 0(x16)
+
+_verify_hash_outer_loop:
+	beq x16, x0, _verify_hash_exit
+	addi x16, x16, -1
 	xor x12, x12, x12
 	la x13, verify_hash_len
 	lw x13, 0(x13)
 	xor x11, x11, x11
 _verify_hash_loop:
-	beq x13, x0, _verify_hash_exit
+	beq x13, x0, _verify_hash_outer_loop
 	lw x14, 0(x12)
 	add x11, x14, x11
 	addi x12, x12, 1
@@ -61,6 +94,9 @@ _verify_hash_loop:
 
 _verify_hash_exit:
 	jalr x0, x1, 0
+
+verify_hash_num_iters:
+	.word 300000
 
 # Print contents of x11 in hex at address x12
 print_as_hex:
@@ -130,6 +166,11 @@ welcome_str:
 welcome_str_len:
 	.word 25
 
+clear_vmem_val:
+	.word 0x20
+
+clear_vmem_len:
+	.word 240
 
 .equ TFT_MEM, 0x40000000
 .equ TESTSTR_LEN, 21
