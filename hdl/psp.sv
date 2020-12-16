@@ -141,9 +141,26 @@ module psp
     tft tft_inst(.*, .clk(sysclk));
 
     always_comb begin
-        tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE;
+        // tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE;
         tft_text_write_port.write_en = main_mem_port_b.write_en & ((main_mem_port_b.addr & TFT_MEM_BASE) != 0);
-        tft_text_write_port.data_i = main_mem_port_b.data_i;
+        // tft_text_write_port.data_i = main_mem_port_b.data_i;
+
+        // Decode one-hot signal
+        case (main_mem_port_b.data_en)
+            4'b0001: tft_text_write_port.data_i = main_mem_port_b.data_i;
+            4'b0010: tft_text_write_port.data_i = main_mem_port_b.data_i >> 8;
+            4'b0100: tft_text_write_port.data_i = main_mem_port_b.data_i >> 16;
+            4'b1000: tft_text_write_port.data_i = main_mem_port_b.data_i >> 24;
+            default: tft_text_write_port.data_i = main_mem_port_b.data_i;
+        endcase
+
+        case (main_mem_port_b.data_en)
+            4'b0001: tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE;
+            4'b0010: tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE + 1;
+            4'b0100: tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE + 2;
+            4'b1000: tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE + 3;
+            default: tft_text_write_port.addr = main_mem_port_b.addr - TFT_MEM_BASE;
+        endcase
     end
 
     assign r_out = r != 0;

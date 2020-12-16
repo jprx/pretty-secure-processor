@@ -505,10 +505,14 @@ module core
     // Memory out value shifted to half position
     logic[15:0] wb_mem_val_half;
 
+    // Unmodified read value
+    logic[31:0] wb_mem_val_orig;
+
     always_comb begin
         wb_mem_val_byte = (dmem.data_o >> {wb.alu_out[1:0], 3'b0});
         wb_mem_val_half = (dmem.data_o >> {wb.alu_out[1], 4'b0});
         wb_mem_val = dmem.data_o;
+        wb_mem_val_orig = dmem.data_o;
 
         if (wb.opcode == op_load || wb.opcode == op_store) begin
             case (func3_mem'(wb.func3))
@@ -561,7 +565,7 @@ module core
         rvfi_out.mem_addr = {wb.alu_out[31:2], 2'b00};
         rvfi_out.mem_rmask = wb.opcode == op_load ? wb.dmem_mask : 4'b0000;
         rvfi_out.mem_wmask = wb.opcode == op_store ? wb.dmem_mask : 4'b0000;
-        rvfi_out.mem_rdata = wb_mem_val;
+        rvfi_out.mem_rdata = wb_mem_val_orig;
         rvfi_out.mem_wdata = wb.dmem_wdata;
     end
 
