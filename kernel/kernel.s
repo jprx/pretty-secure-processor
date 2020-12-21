@@ -28,10 +28,35 @@ la x13, teststr_len
 lw x13, 0(x13)
 jal memcpy
 
+lui x11, %hi(TFT_MEM)
+addi x11, x11, 240
+la x12, testcase_prompt_str
+la x13, testcase_prompt_len
+lw x13, 0(x13)
+jal memcpy
+
+jal malicious
+
+# Should never get here
+lui x11, %hi(TFT_MEM)
+addi x11, x11, 240
+la x12, never_get_here_str
+la x13, never_get_here_len
+lw x13, 0(x13)
+jal memcpy
+
+#j exit
+
+# Malicious method- attempts to mess with return address!
+malicious:
+	addi x1, x1, 1
+	jalr x0, x1, 0
+
+# Wait for interrupt forever
 wfi_loop:
 	j wfi_loop
 
-
+# Exit from simulation
 exit:
     la x1, TEST
     xor x1, x1, x1
@@ -189,17 +214,29 @@ clear_vmem_val:
 	.word 0x20
 
 clear_vmem_len:
-	.word 240
+	.word 2560
+
+testcase_prompt_len:
+	.word 124
+
+never_get_here_len:
+	.word 33
 
 .balign 4
 teststr:
 	.string "Hello World from PSP!"
+
+testcase_prompt_str:
+	.string "About to jump into malicious code.                                              (We should observe an exception after this)!"
 
 welcome_str:
 	.string "Verifying bootrom hash..."
 
 exception_str:
 	.string "Exception: Pointer HMAC Invalid!"
+
+never_get_here_str:
+	.string "You should never see this string."
 
 # Reinforce alignment after the strings
 .balign 4
