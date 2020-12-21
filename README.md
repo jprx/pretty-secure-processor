@@ -11,7 +11,7 @@ When prompted to add design sources, add everything in the `hdl` and `memories` 
 
 To get simulation working, add everything in `hvl`, `memories`, and `kernel/kernel.mem` as simulation sources. Note that the memory initialization files need to be added again here.
 
-A Vivado project file is not included as Vivado exports only copy all design files. So it is better to create a local Vivado project and include all files as references to a local git repo so that you can recompile testcases without having to copy the memory initialization files around, pull new commits, etc.
+A Vivado project file is included at `psp_vivado_project_clean.xpr.zip`, however, it is recommended you create your own Vivado project and pull the code in from git by hand. This is so that you can easily pull new commits and compile test code without needing to copy memory initialization files around everywhere.
 
 ## Simulation
 For simulation, set the top testbench to be one of the following:
