@@ -31,6 +31,9 @@ module core
     logic [31:0] regs[32];
     logic [31:0] pc;
 
+    // Goes high when an exception occurs:
+    logic exception;
+
     /*
      * Fetch
      *
@@ -368,6 +371,7 @@ module core
 
         // Check for branch
         branching = 0;
+        exception = 0;
         branch_target = alu_out;
         if (execute.opcode == op_sret) begin
             branch_target = scall_top;
@@ -378,7 +382,23 @@ module core
                 branching = cmp_out;
             end
 
-            if (execute.opcode == op_jal || execute.opcode == op_jalr || execute.opcode == op_scall || execute.opcode == op_sret) begin
+            if (execute.opcode == op_jalr) begin
+                if (enable_ret_hmac) begin
+                    branch_target = branch_target ^ ((alu_out ^ secret_hmac_key) << 16);
+                    if (branch_target[31:16] != 0) begin
+                        branching = 1'b1;
+                        exception = 1'b1;
+                        branch_target = regs[30];
+                    end else begin
+                        branching = 1'b1;
+                    end
+                end
+                else begin
+                    branching = 1'b1;
+                end
+            end
+
+            if (execute.opcode == op_jal || execute.opcode == op_scall || execute.opcode == op_sret) begin
                 branching = 1'b1;
             end
 
@@ -533,6 +553,14 @@ module core
     // Unmodified read value
     logic[31:0] wb_mem_val_orig;
 
+     // Return address HMAC unit:
+    logic [15:0] ret_addr_hmac;
+    localparam logic[15:0] secret_hmac_key = 16'hdead;
+    logic enable_ret_hmac;
+
+    assign ret_addr_hmac = wb.alu_out ^ secret_hmac_key;
+    assign enable_ret_hmac = 0;
+
     always_comb begin
         wb_mem_val_byte = (dmem.data_o >> {wb.alu_out[1:0], 3'b0});
         wb_mem_val_half = (dmem.data_o >> {wb.alu_out[1], 4'b0});
@@ -593,6 +621,10 @@ module core
                 wb_mem : wb_val = wb_mem_val;
                 default : wb_val = wb.rd_val;
             endcase
+
+            if (wb.opcode == op_jal && enable_ret_hmac) begin
+                wb_val = wb.rd_val | (ret_addr_hmac << 16);
+            end
         end
     end
 

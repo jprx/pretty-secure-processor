@@ -1,5 +1,7 @@
 # Kernel for pretty-secure-processor
 
+la x30, exception_vector
+
 # Clear video memory
 lui x11, %hi(TFT_MEM)
 la x12, clear_vmem_val
@@ -150,6 +152,16 @@ _print_as_hex_byte_int:
 	sb x13, 0(x12)
 	jalr x0, x1, 0
 
+exception_vector:
+	lui x11, %hi(TFT_MEM)
+	la x12, exception_str
+	la x13, exception_str_len
+	lw x13, 0(x13)
+	jal memcpy
+
+loop_forever:
+	j loop_forever
+
 # Number of words to read
 verify_hash_len:
 	.word 16
@@ -162,6 +174,12 @@ teststr:
 
 welcome_str:
 	.string "Verifying bootrom hash..."
+
+exception_str:
+	.string "Exception: Pointer HMAC Invalid!"
+
+exception_str_len:
+	.word 32
 
 welcome_str_len:
 	.word 25
