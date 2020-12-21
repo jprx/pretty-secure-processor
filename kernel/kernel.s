@@ -27,9 +27,32 @@ addi x11, x11, 160
 la x12, teststr
 jal strcpy
 
-# Test pointer HMAC
+# Test 2 secure calls
+# Note: for this to work, the memory initialization file must be modified by hand after compilation!
 lui x11, %hi(TFT_MEM)
 addi x11, x11, 240
+la x12, testcase2_prompt_str1
+jal strcpy
+
+nop
+nop
+nop
+# SCALL
+jal scall_test
+nop
+nop
+nop
+
+lui x11, %hi(TFT_MEM)
+addi x11, x11, 400
+addi x11, x11, 80
+la x12, testcase2_prompt_str2
+jal strcpy
+
+# Test pointer HMAC
+lui x11, %hi(TFT_MEM)
+addi x11, x11, 480
+addi x11, x11, 80
 la x12, testcase_prompt_str
 jal strcpy
 
@@ -40,17 +63,66 @@ nop
 
 # Should only get here if Pointer HMACs are disabled in the core
 lui x11, %hi(TFT_MEM)
-addi x11, x11, 240
+addi x11, x11, 480
 addi x11, x11, 160
+addi x11, x11, 80
 la x12, never_get_here_str
 jal strcpy
 
-#j exit
+j wfi_loop
 
 # Malicious method- attempts to mess with return address!
 malicious:
 	addi x1, x1, 4
 	jalr x0, x1, 0
+
+# scall test- test secure call and secure return!
+scall_test:
+	# Save return address in x17 (unused by anything for now):
+	mv x17, x1
+	lui x11, %hi(TFT_MEM)
+	addi x11, x11, 320
+	la x12, testcase3_prompt_str1
+	jal strcpy
+	nop
+	nop
+	nop
+	nop
+	# SCALL
+	jal scall_test_2
+	nop
+	nop
+	nop
+	nop
+
+	lui x11, %hi(TFT_MEM)
+	addi x11, x11, 400
+	la x12, testcase3_prompt_str2
+	jal strcpy
+
+	mv x1, x17
+
+	# Surround this with 3 nops to make it easier to find when patching memory initialization file
+	nop
+	nop
+	nop
+	# SRET
+	jalr x0, x1, 0
+	nop
+	nop
+	nop
+
+scall_test_2:
+	nop
+	nop
+	nop
+	nop
+	# SRET
+	jalr x0, x1, 0
+	nop
+	nop
+	nop
+	nop
 
 # Wait for interrupt forever
 wfi_loop:
@@ -63,6 +135,7 @@ exit:
     lui x1, 0x600d6
     addi x1, x1, 0x00d
     sb x1, 0(x1)
+    j wfi_loop
 
 # strcpy(dest = x11, src = x12)
 # Yes this is insecure but it makes coding so much more efficient
@@ -257,6 +330,18 @@ teststr:
 
 testcase_prompt_str:
 	.string "About to jump into malicious code.                                              (We should observe an exception after this)!"
+
+testcase2_prompt_str1:
+	.string "About to perform a secure call."
+
+testcase2_prompt_str2:
+	.string "Returned from the first secure call!"
+
+testcase3_prompt_str1:
+	.string "About to perform a nested secure call."
+
+testcase3_prompt_str2:
+	.string "Returned from the nested secure call!"
 
 welcome_str:
 	.string "Verifying bootrom hash..."

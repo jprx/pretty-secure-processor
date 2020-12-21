@@ -1,0 +1,14 @@
+How to patch kernel.mem to add scall / sret support where necessary!
+
+Inner scall:
+Will be surrounded by 4 00000013's on both sides to make it easier to find when editing by hand
+048000ef > 048000d3
+
+Inner sret:
+Will be surrounded by 4 00000013's on both sides to make it easier to find when editing by hand
+00008067 > 00008056
+
+Outer scall:
+Both of these will be surrounded by 3 00000013's on both sides to make it easier to find when editing by hand
+070000ef > 070000d3
+00008067 > 00008056
