@@ -192,7 +192,7 @@ module core
             op_imm      :   execute_next.alu_mux1 = 0;
             op_reg      :   execute_next.alu_mux1 = 0;
 
-            op_scall    :   execute_next.alu_mux1 = 0;
+            op_scall    :   execute_next.alu_mux1 = 1;
 
             default     :   execute_next.alu_mux1 = 0;
         endcase
@@ -621,7 +621,7 @@ module core
             else if (execute.valid && execute.secure_pop && stall_stage < 3) begin
                 // Can never have both WB performing scall and EX performing sret because scall will cause
                 // a pipeline flush in EX
-                scall_top <= secure_stack[secure_ptr - 1];
+                scall_top <= secure_stack[secure_ptr - 2];
                 secure_ptr <= secure_ptr - 1;
             end
         end

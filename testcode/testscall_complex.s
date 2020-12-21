@@ -7,13 +7,29 @@ addi x11, x11, 1
 j exit
 
 testfn:
+	nop
+	nop
+	nop
+	nop
 	addi x1, x1, 1
 	addi x2, x2, 2
 	jal testfn2
+	nop
+	nop
+	nop
+	nop
 	jalr x0, x1, 0
+	nop
+	nop
+	nop
+	nop
 
 
 testfn2:
+	nop
+	nop
+	nop
+	nop
 	jalr x0, x1, 0
 
 # Exit from simulation
