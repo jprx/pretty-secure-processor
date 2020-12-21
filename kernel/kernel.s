@@ -10,30 +10,28 @@ la x13, clear_vmem_len
 lw x13, 0(x13)
 jal memset
 
+# Perform memory hash check
 lui x11, %hi(TFT_MEM)
 la x12, welcome_str
-la x13, welcome_str_len
-lw x13, 0(x13)
-jal memcpy
+jal strcpy
 jal verify_hash
 
+# Print hash to screen
 lui x12, %hi(TFT_MEM)
 addi x12, x12, 80
 jal print_as_hex
 
+# Say hello
 lui x11, %hi(TFT_MEM)
 addi x11, x11, 160
 la x12, teststr
-la x13, teststr_len
-lw x13, 0(x13)
-jal memcpy
+jal strcpy
 
+# Test pointer HMAC
 lui x11, %hi(TFT_MEM)
 addi x11, x11, 240
 la x12, testcase_prompt_str
-la x13, testcase_prompt_len
-lw x13, 0(x13)
-jal memcpy
+jal strcpy
 
 jal malicious
 
@@ -45,9 +43,7 @@ lui x11, %hi(TFT_MEM)
 addi x11, x11, 240
 addi x11, x11, 160
 la x12, never_get_here_str
-la x13, never_get_here_len
-lw x13, 0(x13)
-jal memcpy
+jal strcpy
 
 #j exit
 
@@ -67,6 +63,28 @@ exit:
     lui x1, 0x600d6
     addi x1, x1, 0x00d
     sb x1, 0(x1)
+
+# strcpy(dest = x11, src = x12)
+# Yes this is insecure but it makes coding so much more efficient
+# Uses x14 as a scratch register
+strcpy:
+	xor x14, x14, x14
+_strcpy_loop:
+	lb x14, 0(x12)
+	beq x14, x0, _strcpy_exit
+	sb x14, 0(x11)
+	nop
+	nop
+	nop
+	addi x11, x11, 1
+	addi x12, x12, 1
+	nop
+	nop
+	nop
+	j _strcpy_loop
+
+_strcpy_exit:
+	jalr x0, x1, 0
 
 # memcpy(dest = x11, src = x12, len = x13)
 memcpy:
