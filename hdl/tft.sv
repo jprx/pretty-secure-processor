@@ -99,9 +99,9 @@ module tft
     logic[7:0] textmem[(80*32)-1:0];
 
     initial begin
-        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/logo.mem", logo);
-        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/font.mem", font);
-        $readmemh("/home/joseph/Documents/ECE527/final/pretty-secure-processor/memories/splashscreen.mem", textmem);
+        $readmemh("logo.mem", logo);
+        $readmemh("font.mem", font);
+        $readmemh("splashscreen.mem", textmem);
     end
 
     // Clock generation
@@ -125,12 +125,12 @@ module tft
 
     // Generate screen-space coords
     always_comb begin
-        screen_x = 0;
-        screen_y = 0;
-        if (internal_x >= HSYNC_BPORCH_END && internal_y >= VSYNC_BPORCH_END && internal_x < HSYNC_ACTIVE_END && internal_y < VSYNC_ACTIVE_END) begin
+        // screen_x = 0;
+        // screen_y = 0;
+        // if (internal_x >= HSYNC_BPORCH_END && internal_y >= VSYNC_BPORCH_END && internal_x < HSYNC_ACTIVE_END && internal_y < VSYNC_ACTIVE_END) begin
             screen_x = internal_x - HSYNC_BPORCH_END;
             screen_y = internal_y - VSYNC_BPORCH_END;
-        end
+        // end
     end
 
     always_ff @ (posedge screenclk or posedge reset) begin
@@ -185,7 +185,7 @@ module tft
 
     logic logo_color;
 
-    assign next_screen_x = screen_x + 1;
+    assign next_screen_x = screen_x + 2;
     always_ff @ (posedge screenclk) begin
         next_char_idx <= fontmap[textmem[((screen_y / FONT_HEIGHT) * SCREEN_WIDTH_TEXT) + (next_screen_x / FONT_WIDTH)]];
 
@@ -250,70 +250,3 @@ module tft_wrapper
     assign b_out = b != 0;
 
 endmodule
-
-/*
- * tft_textmemory
- * Dual-port BRAM memory for TFT text mode data
- *
- * Addresses are log base 2 of MEM_SIZE bytes wide. The lower 2 bits
- * are ignored by this module. The data enable signals are respected
- * and are relative to the address modulo 4.
- *
- * So if you read from address 6 for example, with a width of 32 bits
- * you will receive [byte 4, byte 5, byte 6, byte 7] and data enable pins
- * will operate on those bytes. 
- *
- * (You will NOT get something like [byte 6, byte 7, byte 8, byte 9]).
- */
-module tft_textmem
-    #(
-        // Max aligned address will be 1/4 this:
-        parameter MEM_SIZE=8192
-        // 8192 has max aligned address of 2048
-    )
-    (
-        // Port A (READONLY)
-        input logic [$clog2(MEM_SIZE)-1:0] addr_a,
-        output logic [31:0] data_o_a,
-
-        // Port B
-        input logic [$clog2(MEM_SIZE)-1:0] addr_b,
-        input logic [31:0] data_i_b,
-        output logic [31:0] data_o_b,
-        input logic [3:0] data_en_b,
-        input logic write_en_b,
-
-        input clk
-    );
-
-    logic [31:0] ram [(MEM_SIZE/4)-1:0];
-
-    // Strip off 2 lower bits from input addresses:
-    logic [$clog2(MEM_SIZE)-3:0] addr_a_aligned, addr_b_aligned;
-    assign addr_a_aligned = addr_a >> 2;
-    assign addr_b_aligned = addr_b >> 2;
-
-    initial begin
-        $readmemh("/project/memories/hello_tft.mem", ram);
-    end
-
-    always @ (posedge clk) begin
-        // Make port A readonly because Vivado can't infer true dual-port and we don't really need it
-        data_o_a <= ram[addr_a_aligned];
-    end
-
-    always @ (posedge clk) begin
-        // Port B
-        if (write_en_b) begin
-            if(data_en_b[0]) ram[addr_b_aligned][7:0] <= data_i_b[7:0];
-            if(data_en_b[1]) ram[addr_b_aligned][15:8] <= data_i_b[15:8];
-            if(data_en_b[2]) ram[addr_b_aligned][23:16] <= data_i_b[23:16];
-            if(data_en_b[3]) ram[addr_b_aligned][31:24] <= data_i_b[31:24];
-            data_o_b <= ram[addr_b_aligned];
-        end
-        else begin
-            data_o_b <= ram[addr_b_aligned];
-        end
-    end
-
-endmodule // tft_textmem

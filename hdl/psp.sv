@@ -4,6 +4,7 @@
  */
 `include "memory_if.sv"
 `include "rvfi_if.sv"
+`include "defines.sv"
 
 /*
  * psp

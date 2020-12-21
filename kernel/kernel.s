@@ -31,6 +31,14 @@ jal memcpy
 wfi_loop:
 	j wfi_loop
 
+
+exit:
+    la x1, TEST
+    xor x1, x1, x1
+    lui x1, 0x600d6
+    addi x1, x1, 0x00d
+    sb x1, 0(x1)
+
 # memcpy(dest = x11, src = x12, len = x13)
 memcpy:
 _memcpy_loop:
@@ -90,7 +98,7 @@ _verify_hash_loop:
 	beq x13, x0, _verify_hash_outer_loop
 	lw x14, 0(x12)
 	add x11, x14, x11
-	addi x12, x12, 1
+	addi x12, x12, 4
 	addi x13, x13, -1
 	j _verify_hash_loop
 
@@ -163,20 +171,13 @@ loop_forever:
 	j loop_forever
 
 # Number of words to read
+
+.balign 4
 verify_hash_len:
 	.word 16
 
 teststr_len:
 	.word 21
-
-teststr:
-	.string "Hello World from PSP!"
-
-welcome_str:
-	.string "Verifying bootrom hash..."
-
-exception_str:
-	.string "Exception: Pointer HMAC Invalid!"
 
 exception_str_len:
 	.word 32
@@ -190,6 +191,24 @@ clear_vmem_val:
 clear_vmem_len:
 	.word 240
 
+.balign 4
+teststr:
+	.string "Hello World from PSP!"
+
+welcome_str:
+	.string "Verifying bootrom hash..."
+
+exception_str:
+	.string "Exception: Pointer HMAC Invalid!"
+
+# Reinforce alignment after the strings
+.balign 4
+
 .equ TFT_MEM, 0x40000000
 .equ TESTSTR_LEN, 21
 .equ TEST_CHAR, 0x41
+
+.section .rodata
+.balign 256
+TEST: .word 0x42424242
+

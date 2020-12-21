@@ -558,8 +558,8 @@ module core
     localparam logic[15:0] secret_hmac_key = 16'hdead;
     logic enable_ret_hmac;
 
-    assign ret_addr_hmac = wb.alu_out ^ secret_hmac_key;
-    assign enable_ret_hmac = 0;
+    assign ret_addr_hmac = wb.rd_val ^ secret_hmac_key;
+    assign enable_ret_hmac = 1;
 
     always_comb begin
         wb_mem_val_byte = (dmem.data_o >> {wb.alu_out[1:0], 3'b0});
@@ -586,6 +586,22 @@ module core
                 end
             endcase
         end
+
+        // Execute writes whatever needs to get stored (except for memory obviously) into rd_val
+        if (wb.rd_idx == 0) begin
+            wb_val = 0;
+        end
+        else begin
+            case (wb.wb_command)
+                wb_mem : wb_val = wb_mem_val;
+                default : wb_val = wb.rd_val;
+            endcase
+
+            if (wb.opcode == op_jal && enable_ret_hmac) begin
+                wb_val = wb.rd_val | (ret_addr_hmac << 16);
+                // $display("Signing return address with hmac of %0h to get %0h", ret_addr_hmac, wb_val);
+            end
+        end
     end
 
     // Secure stack:
@@ -607,23 +623,6 @@ module core
                 // a pipeline flush in EX
                 scall_top <= secure_stack[secure_ptr - 1];
                 secure_ptr <= secure_ptr - 1;
-            end
-        end
-    end
-
-    always_comb begin
-        // Execute writes whatever needs to get stored (except for memory obviously) into rd_val
-        if (wb.rd_idx == 0) begin
-            wb_val = 0;
-        end
-        else begin
-            case (wb.wb_command)
-                wb_mem : wb_val = wb_mem_val;
-                default : wb_val = wb.rd_val;
-            endcase
-
-            if (wb.opcode == op_jal && enable_ret_hmac) begin
-                wb_val = wb.rd_val | (ret_addr_hmac << 16);
             end
         end
     end
