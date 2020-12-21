@@ -37,9 +37,13 @@ jal memcpy
 
 jal malicious
 
-# Should never get here
+# Skip over this instruction if we do return (malicious increments return address by 4)
+nop
+
+# Should only get here if Pointer HMACs are disabled in the core
 lui x11, %hi(TFT_MEM)
 addi x11, x11, 240
+addi x11, x11, 160
 la x12, never_get_here_str
 la x13, never_get_here_len
 lw x13, 0(x13)
@@ -49,7 +53,7 @@ jal memcpy
 
 # Malicious method- attempts to mess with return address!
 malicious:
-	addi x1, x1, 1
+	addi x1, x1, 4
 	jalr x0, x1, 0
 
 # Wait for interrupt forever
@@ -187,6 +191,13 @@ _print_as_hex_byte_int:
 
 exception_vector:
 	lui x11, %hi(TFT_MEM)
+	addi x11, x11, 240
+	addi x11, x11, 240
+	addi x11, x11, 240
+	addi x11, x11, 240
+	addi x11, x11, 240
+	addi x11, x11, 240
+	addi x11, x11, 240
 	la x12, exception_str
 	la x13, exception_str_len
 	lw x13, 0(x13)
@@ -205,7 +216,7 @@ teststr_len:
 	.word 21
 
 exception_str_len:
-	.word 32
+	.word 80
 
 welcome_str_len:
 	.word 25
@@ -233,8 +244,9 @@ welcome_str:
 	.string "Verifying bootrom hash..."
 
 exception_str:
-	.string "Exception: Pointer HMAC Invalid!"
+	.string "                        Exception: Pointer HMAC Invalid!                        "
 
+.balign 4
 never_get_here_str:
 	.string "You should never see this string."
 

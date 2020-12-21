@@ -51,7 +51,7 @@ module memory
     end
 
     // I wonder what happens if both ports try to write to the same address at the same time... Hmm
-
+ 
     always @ (posedge clk) begin
         // Port A
         /*
