@@ -12,7 +12,7 @@ The LCD is attached to the processor using the [Adafruit TFT Friend](https://www
 
 ![screen](images/screen.png)
 
-Image 1: The processor displaying the TCM RAM hash and a hello world, along with a hardware sprite.
+Image 1: The processor displaying the TCM RAM hash and a hello world message, along with a hardware sprite.
 
 ![screen_logo](images/screen_logo.png)
 
