@@ -54,7 +54,9 @@ The first 8KB of memory is the executable Tightly Coupled Memory (TCM) RAM regio
 
 The region of memory from `0x40000000` to `0x40000A00` corresponds to text mode video RAM. This region is write-only and provides the core with a way to control the output of the TFT-LCD controller.
 
-![memory_map](images/memory.png)
+<p align="center">
+  <img src="images/memory_small.png">
+</p>
 
 ## Pipelined LCD Character Driver
 The LCD screen features a pipelined text-mode character driver that generates text-mode pixel data on the fly. A framebuffer would be too costly in terms of memory usage, so instead I generate pixel data lazily just before it is needed. As the LCD controller uses dual-port BRAM, there is no bus contention reading character data, and therefore memory access latencies are guaranteed, and the pipeline will be able to generate pixel data exactly when needed.
