@@ -4,9 +4,13 @@
 
 Pretty Secure Processor is a complete synthesizable SoC featuring a custom 5-stage pipelined RISC-V CPU core with precise exception support, a LCD display driver circuit, and several architectural security enhancements to protect control flow integrity within the core.
 
+![screen_logo](images/screen_logo.png)
+
 # Interface
 
-The processor features a memory-mapped LCD controller that can output data to a real 800 by 480 pixel LCD screen over the 40-pin parallel RGB protocol. The LCD is attached to the processor using the [Adafruit TFT Friend](https://www.adafruit.com/product/1932), which provides a boost converter for powering the backlight, as well as a way to route the signals into the flex PCB cable. The LCD controller also supports hardware sprites as can be seen below.
+The processor features a memory-mapped LCD controller that can output data to a real 800 by 480 pixel LCD screen over the 40-pin parallel RGB protocol. The LCD controller supports text mode graphics at a resolution of 80 columns by 32 rows. The LCD controller also supports hardware sprites as can be seen below.
+
+The LCD is attached to the processor using the [Adafruit TFT Friend](https://www.adafruit.com/product/1932), which provides a boost converter for powering the backlight, as well as a way to route the signals into the flex PCB cable.
 
 ![screen](images/screen.png)
 
@@ -20,11 +24,11 @@ Pointer HMACs are signatures placed in the upper 2 bytes of a pointer that verif
 
 ![hmac](images/pointer_hmac.png)
 
-The benefit of this feature is that it is architecturally transparent to the program running on the chip- nothing extra needs to be done in order for this feature to work. However, as the HMAC is 16 bits long, it is inherently bruteforceable by nature. Secure Calls are an even more secure programming interface, however, they do require postprocessing generated code to add (as they are implemented by separate opcodes from `jal`/`jalr`).
-
 Currently, the HMAC scheme used XORs the lower 2 bytes of the pointer with a processor secret key (this is to keep the latency of signing to a constant time to prevent introducing side channel attack vectors). By analyzing encrypted pointers, an attacker could easily leak the secret key and sign their own pointer HMACs. This scheme is not cryptographically secure, however it is valuable regardless, as it adds a "tamper resistance" to the pointer that would not be found without it. A dedicated attacker would be able to bypass this scheme as it currently stands. In the future I want to expand this scheme with a cryptographically secure HMAC.
 
 Pointer HMACs are an implementation of Pointer Authentication Codes, which are an architectural security feature found in ARM processors [16].
+
+The benefit of this feature is that it is architecturally transparent to the program running on the chip- nothing extra needs to be done in order for this feature to work. However, as the HMAC is 16 bits long, it is inherently bruteforceable by nature. Secure Calls are an even more secure programming interface, however, they do require postprocessing generated code to add (as they are implemented by separate opcodes from `jal`/`jalr`).
 
 ## Secure Calls
 Secure Calls are a new way to call subroutines. The call stack is split into two architecturally distinct stacks, the i-stack and d-stack, where the i-stack is backed by a region of shadow memory not accessible anywhere else in the core. This allows for secure call and secure return to provide complete control flow integrity guarantees.
@@ -37,7 +41,7 @@ The only way the contents of the secure stack can be written to is via a secure 
 
 `sret` has the same instruction format as `jalr` with the opcode encoding `1010110`.
 
-At this time there is no architectural support for an indirect secure call, so all secure call targets must be located within a +/- 1MB range of the caller (direct jump).
+At this time, there is no architectural support for an indirect secure call, so all secure call targets must be located within a +/- 1MB range of the caller (direct jump).
 
 ![secure_call](images/secure_call.png)
 
