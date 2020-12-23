@@ -19,7 +19,7 @@ Image 1: The processor displaying the TCM RAM hash and a hello world, along with
 Image 2: The hardware sprite generator displaying copies of the logo sprite.
 
 # Core Architecture
-The core is a 5-stage pipelined RISC-V core that supports the majority of the RV32I ISA. Below is a diagram of the processor datapath with emphasis on the architectural security features unique to Pretty Secure Processor.
+The core is a 5-stage pipelined RISC-V core that supports the majority of the RV32I ISA [10]. Below is a diagram of the processor datapath with emphasis on the architectural security features unique to Pretty Secure Processor.
 
 ![core_arch](images/psp_datapath.png)
 
@@ -109,4 +109,6 @@ Make sure to add `hdl/constraints.xdc` to the project!
 This project began as my final project for ECE 527: System on a Chip Design.
 
 # References
+The project logo includes a graphic from Apple's Keynote software [2].
+
 ![references](images/references.png)
