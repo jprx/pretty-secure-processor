@@ -4,8 +4,6 @@
 
 Pretty Secure Processor is a complete synthesizable SoC featuring a custom 5-stage pipelined RISC-V CPU core with precise exception support, a LCD display driver circuit, and several architectural security enhancements to protect control flow integrity within the core.
 
-![screen_logo](images/screen_logo.png)
-
 # Interface
 
 The processor features a memory-mapped LCD controller that can output data to a real 800 by 480 pixel LCD screen over the 40-pin parallel RGB protocol. The LCD controller supports text mode graphics at a resolution of 80 columns by 32 rows. The LCD controller also supports hardware sprites as can be seen below.
@@ -13,6 +11,12 @@ The processor features a memory-mapped LCD controller that can output data to a 
 The LCD is attached to the processor using the [Adafruit TFT Friend](https://www.adafruit.com/product/1932), which provides a boost converter for powering the backlight, as well as a way to route the signals into the flex PCB cable.
 
 ![screen](images/screen.png)
+
+Image 1: The processor displaying the TCM RAM hash and a hello world, along with a hardware sprite.
+
+![screen_logo](images/screen_logo.png)
+
+Image 2: The hardware sprite generator displaying copies of the logo sprite.
 
 # Core Architecture
 The core is a 5-stage pipelined RISC-V core that supports the majority of the RV32I ISA. Below is a diagram of the processor datapath with emphasis on the architectural security features unique to Pretty Secure Processor.
