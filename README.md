@@ -1,5 +1,3 @@
-# pretty-secure-processor
-
 ![logo](images/banner.png)
 
 Pretty Secure Processor is a complete synthesizable SoC featuring a custom 5-stage pipelined RISC-V CPU core with precise exception support, a LCD display driver circuit, and several architectural security enhancements to protect control flow integrity within the core.
